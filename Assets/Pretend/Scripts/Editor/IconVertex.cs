@@ -48,11 +48,13 @@ public class IconVertex : ScriptableObject
 	{
 		get
 		{
-			return RawPos + IconSetWindow.Instance.GridOffset;
+			//return RawPos + IconSetWindow.Instance.GridOffset;
+			return RawPos;
 		}
 		set
 		{
-			_pos = value - IconSetWindow.Instance.GridOffset;
+			//_pos = value - IconSetWindow.Instance.GridOffset;
+			_pos = value;
 		}
 	}
 
@@ -75,7 +77,8 @@ public class IconVertex : ScriptableObject
 	{
 		get
 		{
-			return Event.current.mousePosition - IconSetWindow.Instance.GridOffset;
+			//return Event.current.mousePosition - IconSetWindow.Instance.GridOffset;
+			return Event.current.mousePosition;
 		}
 	}
 

@@ -21,6 +21,7 @@ public class IconSetWindow : EditorWindow
 
 	Rect settingsDropdownRect;
 	Rect gridRect;
+	public IconCanvas canvas;
 
 	#endregion
 
@@ -68,21 +69,35 @@ public class IconSetWindow : EditorWindow
 
 	#region Grid Offset
 
-	Vector2 _gridOffset;
-	public Vector2 GridOffset
-	{
-		get
-		{
-			if (_gridOffset == null)
-				_gridOffset = Vector2.zero;
+	//AnimVector3 _offset;
+	//public AnimVector3 Offset
+	//{
+	//	get
+	//	{
+	//		if (_offset == null)
+	//			_offset = new AnimVector3(Vector3.zero);
+	//		if (_offset.valueChanged == null)
+	//			_offset.valueChanged = new UnityEngine.Events.UnityEvent();
 
-			return _gridOffset;
-		}
-		set
-		{
-			_gridOffset = value;
-		}
-	}
+	//		return _offset;
+	//	}
+	//}
+
+	//Vector2 _gridOffset;
+	//public Vector2 GridOffset
+	//{
+	//	get
+	//	{
+	//		if (_gridOffset == null)
+	//			_gridOffset = Vector2.zero;
+
+	//		return _gridOffset;
+	//	}
+	//	set
+	//	{
+	//		_gridOffset = value;
+	//	}
+	//}
 
 	#endregion
 
@@ -200,7 +215,10 @@ public class IconSetWindow : EditorWindow
 		Prefs.GridSpacing.valueChanged.AddListener(Repaint);
 		Prefs.GridDetailLines.valueChanged.AddListener(Repaint);
 
-		ResetGrid();
+		//if (!canvas)
+		canvas = CreateInstance(typeof(IconCanvas)) as IconCanvas;
+
+		canvas.Size.valueChanged.AddListener(Repaint);
 	}
 
 	void OnDisable()
@@ -214,17 +232,14 @@ public class IconSetWindow : EditorWindow
 
 	void OnGUI()
 	{
+		//DrawVertices();
 		DrawGrid();
-		DoGridCursor();
-		DrawVertices();
-		DoSelectionBox();
-
 		DrawToolbar();
 
-		ProcessVertexEvents(Event.current);
-		ProcessEvents(Event.current);
+		canvas.ProcessEvents(Event.current);
+		//ProcessVertexEvents(Event.current);
 
-		PurgeDestroyList();
+		//PurgeDestroyList();
 
 		if (GUI.changed)
 			Repaint();
@@ -250,9 +265,7 @@ public class IconSetWindow : EditorWindow
 		}
 
 		GUILayout.Space(5f);
-		GUILayout.Label(" (" + GridOffset.x.ToString("0.0") + ", " + GridOffset.y.ToString("0.0") + ") ", EditorStyles.toolbarTextField);
-		GUILayout.Space(5f);
-		GUILayout.Label(" Mouse on grid: " + MouseOverGrid() + " ", EditorStyles.toolbarTextField);
+		GUILayout.Label(" (" + canvas.offset.x.ToString("0.0") + ", " + canvas.offset.y.ToString("0.0") + ") ", EditorStyles.toolbarTextField);
 		GUILayout.FlexibleSpace();
 
 		// Dropdown
@@ -277,60 +290,25 @@ public class IconSetWindow : EditorWindow
 
 	void TrimGrid()
 	{
-		gridRect.position = Vector2.zero;
-		gridRect.size = position.size;
-		gridRect = gridRect.TrimEdge(RectEdge.Top, ToolbarHeight);
+		gridRect.Set(0f, ToolbarHeight - 1f, position.width, position.height - (ToolbarHeight - 1f));
+		//gridRect.center = new Vector2(position.width / 2f, position.height / 2f);
+		//gridRect.position = new Vector2(0f, ToolbarHeight);
+		//gridRect.size = position.size;
+		//gridRect = gridRect.TrimEdge(RectEdge.Top, ToolbarHeight);
+
+		canvas.SetContainerRect(gridRect);
 	}
 
 	void DrawGrid()
 	{
 		TrimGrid();
 
-		DrawGridLines(Prefs.GridSpacing.value / (int)Prefs.GridDetailLines.target, Color.gray, 0.2f);
-		DrawGridLines(Prefs.GridSpacing.value, Color.gray, 0.4f);
-	}
-
-	void DrawGridLines(float spacing, Color color, float alpha)
-	{
-		int xDivs = Mathf.CeilToInt((gridRect.width + spacing) / spacing);
-		int yDivs = Mathf.CeilToInt((gridRect.height + spacing) / spacing);
-
-		Handles.BeginGUI();
-		Handles.color = new Color(color.r, color.g, color.b, alpha);
-
-		Vector3 newOffset = new Vector3(GridOffset.x % spacing, GridOffset.y % spacing, 0);
-
-		Vector3 from = Vector3.zero;
-		Vector3 to = Vector3.zero;
-
-		for (int x = 0; x < xDivs; x++)
-		{
-			from.x = to.x = newOffset.x + (spacing * x);
-			from.y = newOffset.y - spacing;
-			to.y = newOffset.y + gridRect.height + spacing;
-			Handles.DrawLine(from, to);
-		}
-		for (int y = 0; y < yDivs; y++)
-		{
-			from.y = to.y = newOffset.y + (spacing * y);
-			from.x = newOffset.x - spacing;
-			to.x = newOffset.x + gridRect.width + spacing;
-			Handles.DrawLine(from, to);
-		}
-
-		Handles.color = Color.white;
-		Handles.EndGUI();
+		canvas.Draw();
 	}
 
 	void ResetGrid()
 	{
-		GridOffset = Vector2.zero;
-		UpdateVertices();
-	}
-
-	bool MouseOverGrid()
-	{
-		return gridRect.Contains(Event.current.mousePosition);
+		canvas.Reset();
 	}
 
 	#region Zoom
@@ -351,7 +329,7 @@ public class IconSetWindow : EditorWindow
 
 		float percentage = 1f - (cameraDistance / initialDistance);
 		if (!zoomTowardsCenter)
-			GridOffset += pivotVector * percentage;
+			canvas.offset += pivotVector * percentage;
 
 		Event.current.Use();
 	}
@@ -364,102 +342,7 @@ public class IconSetWindow : EditorWindow
 
 	void ProcessEvents(Event e)
 	{
-		switch (e.type)
-		{
-			case EventType.MouseDown:
-				OnMouseDown(e);
-				break;
 
-			case EventType.MouseUp:
-				OnMouseUp(e);
-				break;
-
-			case EventType.MouseDrag:
-				OnCanvasDrag(e);
-				break;
-
-			case EventType.ScrollWheel:
-				if (e.isScrollWheel)
-					HandleScrollWheel(true);
-				break;
-		}
-	}
-
-	void ShowContextMenu(Vector2 pos)
-	{
-		//GenericMenu generic = new GenericMenu();
-		//generic.AddItem(new GUIContent("Add Vertex"), false, () => { CreateVertex(pos); });
-		//generic.ShowAsContext();
-
-		CreateVertex(pos);
-	}
-
-	void OnMouseDown(Event e)
-	{
-		if (!MouseOverGrid())
-			return;
-
-		if (e.button == 0)
-		{
-			selectingRect = new Rect(e.mousePosition, Vector2.zero);
-			selectingCanvas = true;
-		}
-		if (e.button == 1)
-		{
-			ShowContextMenu(e.mousePosition);
-		}
-		if (e.button == 2)
-		{
-			draggingCanvas = true;
-		}
-
-		GUI.changed = true;
-	}
-
-	void OnMouseUp(Event e)
-	{
-		if (e.button == 0)
-		{
-			selectingCanvas = false;
-		}
-		if (e.button == 2)
-		{
-			draggingCanvas = false;
-		}
-
-		GUI.changed = true;
-	}
-
-	bool draggingCanvas;
-	bool selectingCanvas;
-	Rect selectingRect;
-
-	void OnCanvasDrag(Event e)
-	{
-		if (e.button == 0 && selectingCanvas)
-		{
-			selectingRect.max += e.delta;
-			GUI.changed = true;
-		}
-		if (e.button == 2 && draggingCanvas)
-		{
-			GridOffset += e.delta;
-			UpdateVertices();
-		}
-	}
-
-	void DoGridCursor()
-	{
-		if (draggingCanvas)
-			EditorGUIUtility.AddCursorRect(gridRect, MouseCursor.Pan);
-	}
-
-	void DoSelectionBox()
-	{
-		if (!selectingCanvas)
-			return;
-
-		EditorGUI.DrawRect(selectingRect, Color.red.WithAlpha(0.2f));
 	}
 
 	#endregion
@@ -622,9 +505,7 @@ public class SettingsPopup : PopupWindowContent
 	void DrawHeader()
 	{
 		EditorGUILayout.BeginVertical(bg);
-		IconSetWindow.Instance.Prefs.Size.target = DrawSlider("Size", IconSetWindow.Instance.Prefs.Size.target, 10f, 30f);
-		IconSetWindow.Instance.Prefs.GridSpacing.target = DrawSlider("Grid spacing", IconSetWindow.Instance.Prefs.GridSpacing.target, 100f, 500f);
-		IconSetWindow.Instance.Prefs.GridDetailLines.target = (int)DrawSlider("Grid detail lines", (int)IconSetWindow.Instance.Prefs.GridDetailLines.target, 1, 12);
+		IconSetWindow.Instance.canvas.Size.target = DrawSlider("Size", IconSetWindow.Instance.canvas.Size.target, 0.5f, 2f);
 		EditorGUILayout.EndVertical();
 	}
 
@@ -857,20 +738,36 @@ public class IconCanvas : ScriptableObject
 	public Rect container;
 	public Vector2 position;
 	public Vector2 localPosition;
-	public Vector2 pivot;
+	public Vector2 pivot = Vector2.zero;
 	public Vector2 offset;
+	Rect gridRect;
 
-	public int width;
-	public int height;
+	const float gridWidth = 600f;
+	const float checkVal = 280f;
 
-	public int majorLineInterval;
-	public int minorLineInterval;
+	Vector2 center { get { return container.center + offset; } }
+	Rect[] backgroundRects = new Rect[] { new Rect(), new Rect(), new Rect(), new Rect() };
 
-	public float scale = 100f;
-	public float zoom = 1f;
+	AnimFloat _size;
+	public AnimFloat Size
+	{
+		get
+		{
+			if (_size == null)
+				_size = new AnimFloat(1f);
+			if (_size.valueChanged == null)
+				_size.valueChanged = new UnityEngine.Events.UnityEvent();
+
+			return _size;
+		}
+	}
 
 	public List<IconGlyph> glyphs;
 	public List<UnityEngine.Object> toDestroy;
+
+	public bool draggingCanvas;
+
+	Texture2D bgTex;
 
 	public IconCanvas()
 	{
@@ -878,68 +775,178 @@ public class IconCanvas : ScriptableObject
 		toDestroy = new List<UnityEngine.Object>();
 	}
 
+	void OnEnable()
+	{
+		Size.valueChanged.AddListener(OnSizeChanged);
+		gridRect = new Rect();
+
+		bgTex = new Texture2D(2, 2);
+		bgTex.SetPixel(0, 0, new Color(0.1f, 0.1f, 0.1f, 0.2f));
+		bgTex.SetPixel(0, 1, Color.clear);
+		bgTex.SetPixel(1, 1, new Color(0.1f, 0.1f, 0.1f, 0.2f));
+		bgTex.SetPixel(1, 0, Color.clear);
+		bgTex.alphaIsTransparency = true;
+		bgTex.wrapMode = TextureWrapMode.Repeat;
+		bgTex.filterMode = FilterMode.Point;
+		bgTex.Apply();
+	}
+
 	public void SetContainerRect(Rect trimmed)
 	{
-		container = new Rect(trimmed);
+		container = trimmed;
+	}
+
+	public void Reset()
+	{
+		SetOffset(Vector2.zero);
+		Size.target = Size.value = 1f;
 	}
 
 	public void Draw()
 	{
 		DrawGrid();
-		DrawGlyphs();
+		//DrawGlyphs();
 	}
 
-	#region Refactoring
+	void CheckOffset()
+	{
+		float halfW = (container.width / 2f) + (checkVal * Size.value);
+		float halfH = (container.height / 2f) + (checkVal * Size.value);
+
+		float x = offset.x;
+		float y = offset.y;
+
+		if (x < -halfW)
+			x = -halfW;
+		if (x > halfW)
+			x = halfW;
+
+		if (y < -halfH)
+			y = -halfH;
+		if (y > halfH)
+			y = halfH;
+
+		offset.x = x;
+		offset.y = y;
+	}
 
 	void DrawGrid()
 	{
-		DrawGridLines(scale / minorLineInterval, Color.gray, 0.2f);
-		DrawGridLines(scale, Color.gray, 0.4f);
+		CheckOffset();
+		CalculateGridRect();
+		Color c = new Color(0.1f, 0.1f, 0.1f);
+		DrawBackground(gridRect, c, 0.6f, 5f * Size.value);
+
+		//GUI.DrawTexture(container, BGTex, ScaleMode.ScaleAndCrop);
+		//GUI.DrawTextureWithTexCoords(container, BGTex, new Rect(container.position, new Vector2(container.width / gridRect.width, container.height / gridRect.height) * Size.value));
+
+		//Vector2 pos = Vector3.Scale((gridRect.center / sizeVal), new Vector2(-1f, 1f));
+		//Vector2 pos = (container.center + offset) / sizeVal;
+		//Vector2 pos = (gridRect.position / sizeVal) - (offset / sizeVal);
+		//Vector2 pos = (gridRect.position / sizeVal) - offset / sizeVal;
+
+		//Vector2 pos = (offset / sizeVal) + (gridRect.size / sizeVal);
+		//pos.x = -pos.x;
+		//pos.y = -pos.y;
+
+		//Vector2 size = container.size / sizeVal;
+		//GUI.DrawTextureWithTexCoords(container, BGTex, new Rect(pos, size));
+
+		int pow = 4;
+		float val = 3f * Mathf.Pow(2f, pow);
+
+		float sizeVal = gridWidth * Size.value;
+		GUI.DrawTextureWithTexCoords(gridRect, bgTex, new Rect(Vector2.zero, val * gridRect.size / sizeVal));
+
+		DrawGridRect(gridRect, 24, Color.grey, 0.3f);
+		DrawGridRect(gridRect, 6, Color.grey, 0.6f);
 	}
 
-	void DrawGridLines(float spacing, Color color, float alpha)
+	void CalculateGridRect()
 	{
-		int xDivs = Mathf.CeilToInt((container.width + spacing) / spacing);
-		int yDivs = Mathf.CeilToInt((container.height + spacing) / spacing);
+		float size = gridWidth * Size.value;
+		gridRect.Set(center.x - (size / 2f), center.y - (size / 2f), size, size);
+	}
 
+	void DrawBackground(Rect exclude, Color color, float alpha, float border = 0f)
+	{
+		backgroundRects[0].Set(container.x, container.y, exclude.xMin - border, container.height); // Left
+		backgroundRects[1].Set(exclude.xMax + border, container.y, container.xMax - exclude.xMax - border, container.height); // Right
+		backgroundRects[2].Set(exclude.xMin - border, container.y, exclude.width + border + border, exclude.yMin - container.yMin - border); // Top
+		backgroundRects[3].Set(exclude.xMin - border, exclude.yMax + border, exclude.width + border + border, container.yMax - exclude.yMax - border); // Bottom
+
+		Color bg = new Color(color.r, color.g, color.b, alpha);
+		for (int i = 0; i < 4; i++)
+			EditorGUI.DrawRect(backgroundRects[i], bg);
+	}
+
+	void DrawGridRect(Rect grid, int dp, Color color, float alpha)
+	{
 		Handles.BeginGUI();
 		Handles.color = new Color(color.r, color.g, color.b, alpha);
 
-		Vector3 newOffset = new Vector3(offset.x % spacing, offset.y % spacing, 0);
+		float spacing = grid.width / dp;
 
-		Vector3 from = Vector3.zero;
-		Vector3 to = Vector3.zero;
+		Vector3 from = new Vector3(grid.x, grid.yMin);
+		Vector3 to = new Vector3(grid.x, grid.yMax);
 
-		for (int x = 0; x < xDivs; x++)
+		for (int x = 0; x <= dp; x++)
 		{
-			from.x = to.x = newOffset.x + (spacing * x);
-			from.y = newOffset.y - spacing;
-			to.y = newOffset.y + container.height + spacing;
 			Handles.DrawLine(from, to);
+			from.x += spacing;
+			to.x += spacing;
 		}
-		for (int y = 0; y < yDivs; y++)
+
+		from = new Vector3(grid.xMin, grid.y);
+		to = new Vector3(grid.xMax, grid.y);
+
+		for (int y = 0; y <= dp; y++)
 		{
-			from.y = to.y = newOffset.y + (spacing * y);
-			from.x = newOffset.x - spacing;
-			to.x = newOffset.x + container.width + spacing;
 			Handles.DrawLine(from, to);
+			from.y += spacing;
+			to.y += spacing;
 		}
 
 		Handles.color = Color.white;
 		Handles.EndGUI();
 	}
 
-	void ResetGrid()
+	void DrawGridCenter(int dp, float size, Color color, float alpha)
 	{
-		offset = Vector2.zero;
+		Handles.BeginGUI();
+		Handles.color = new Color(color.r, color.g, color.b, alpha);
+
+		int hdp = dp / 2;
+		float spacing = size / dp;
+
+		Vector3 from = new Vector3(center.x - (hdp * spacing), center.y - (hdp * spacing));
+		Vector3 to = new Vector3(center.x - (hdp * spacing), center.y + (hdp * spacing));
+
+		for (int x = 0; x <= dp; x++)
+		{
+			Handles.DrawLine(from, to);
+			from.x += spacing;
+			to.x += spacing;
+		}
+
+		from = new Vector3(center.x - (hdp * spacing), center.y - (hdp * spacing));
+		to = new Vector3(center.x + (hdp * spacing), center.y - (hdp * spacing));
+
+		for (int y = 0; y <= dp; y++)
+		{
+			Handles.DrawLine(from, to);
+			from.y += spacing;
+			to.y += spacing;
+		}
+
+		Handles.color = Color.white;
+		Handles.EndGUI();
 	}
 
 	bool MouseOverGrid()
 	{
 		return container.Contains(Event.current.mousePosition);
 	}
-
-	#endregion
 
 	public IconGlyph CreateGlyph()
 	{
@@ -972,14 +979,14 @@ public class IconCanvas : ScriptableObject
 
 	public void Move(Vector2 delta)
 	{
-		position += delta;
-		glyphs.ForEach(g => g.Move(delta));
+		offset += delta;
+		//glyphs.ForEach(g => g.Move(delta));
 	}
 
 	public void MoveLocal(Vector2 delta)
 	{
 		localPosition += delta;
-		glyphs.ForEach(g => g.MoveLocal(delta));
+		//glyphs.ForEach(g => g.MoveLocal(delta));
 	}
 
 	public void SetPosition(Vector2 pos)
@@ -994,10 +1001,106 @@ public class IconCanvas : ScriptableObject
 		// do something to the glyphs
 	}
 
-	public void SetZoom(float val, Vector2 pivot)
+	public void SetOffset(Vector2 offset)
+	{
+		this.offset = offset;
+	}
+
+	#region Events
+
+	public void ProcessEvents(Event e)
+	{
+		switch (e.type)
+		{
+			case EventType.MouseDown:
+				OnMouseDown(e);
+				break;
+
+			case EventType.MouseUp:
+				OnMouseUp(e);
+				break;
+
+			case EventType.MouseDrag:
+				OnCanvasDrag(e);
+				break;
+
+			case EventType.ScrollWheel:
+				OnScroll(e);
+				break;
+		}
+	}
+
+	void OnMouseDown(Event e)
+	{
+		if (!MouseOverGrid())
+			return;
+
+		if (e.button == 0 || e.button == 2)
+		{
+			draggingCanvas = true;
+		}
+
+		GUI.changed = true;
+	}
+
+	void OnMouseUp(Event e)
+	{
+		if (!draggingCanvas)
+			return;
+
+		if (e.button == 0 || e.button == 2)
+		{
+			draggingCanvas = false;
+		}
+
+		GUI.changed = true;
+	}
+
+	void OnCanvasDrag(Event e)
+	{
+		if (draggingCanvas)
+		{
+			Move(e.delta);
+
+			GUI.changed = true;
+		}
+	}
+
+	void ShowContextMenu(Vector2 pos)
+	{
+		//GenericMenu generic = new GenericMenu();
+		//generic.AddItem(new GUIContent("Add Vertex"), false, () => { CreateVertex(pos); });
+		//generic.ShowAsContext();
+
+		//CreateVertex(pos);
+	}
+
+	float zoomSensitivity = 1f;
+
+	void OnScroll(Event e)
+	{
+		if (!e.isScrollWheel)
+			return;
+
+		pivot = e.mousePosition;
+
+		float prev = Size.value;
+		Size.target = Size.value = Mathf.Abs(Size.value) * (-e.delta.y * zoomSensitivity * .015f + 1.0f);
+		float perc = 1f - (Size.value / prev);
+
+		Vector2 toCenter = pivot - center;
+
+		offset += toCenter * perc;
+
+		e.Use();
+	}
+
+	void OnSizeChanged()
 	{
 
 	}
+
+	#endregion
 
 }
 
