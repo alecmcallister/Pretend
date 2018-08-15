@@ -256,7 +256,7 @@ public class IconVertex : ScriptableObject
 		{
 			if (e.control)
 			{
-				Drag(IconSetWindow.Instance.Prefs.GridSpacing.target / IconSetWindow.Instance.Prefs.GridDetailLines.target, true);
+				//Drag(IconSetWindow.Instance.Prefs.GridSpacing.target / IconSetWindow.Instance.Prefs.GridDetailLines.target, true);
 			}
 			else
 			{
@@ -271,7 +271,7 @@ public class IconVertex : ScriptableObject
 
 	public void FollowGrid()
 	{
-		float spacing = IconSetWindow.Instance.Prefs.GridSpacing.value;
+		//float spacing = IconSetWindow.Instance.Prefs.GridSpacing.value;
 		//RawPos = new Vector2(Handles.SnapValue(MousePosition.x, interval), Handles.SnapValue(MousePosition.y, interval));
 
 	}

@@ -30,33 +30,22 @@ public static partial class Extensions
 		return new RectOffset(val, val, val, val);
 	}
 
-	/// <summary>
-	/// Haircut for your rect
-	/// </summary>
-	/// <param name="rect">The rect getting the haircut</param>
-	/// <param name="edge">Which edge to trim</param>
-	/// <param name="amount">Amount to trim</param>
-	/// <returns>The original rect with a fancy new look</returns>
-	public static Rect TrimEdge(this Rect rect, RectEdge edge, float amount)
+	public static GUIStyle ActuallyCopyFrom(this GUIStyle style, GUIStyle other)
 	{
-		switch (edge)
-		{
-			case RectEdge.Left:
-				rect.xMin += amount;
-				break;
-			case RectEdge.Right:
-				rect.xMax -= amount;
-				break;
-			case RectEdge.Top:
-				// May be backwards
-				rect.yMin += amount;
-				break;
-			case RectEdge.Bottom:
-				// May be backwards
-				rect.yMax -= amount;
-				break;
-		}
-		return rect;
+
+		style = new GUIStyle(other);
+
+		style.active = other.active;
+		style.hover = other.hover;
+		style.focused = other.focused;
+		style.normal = other.normal;
+
+		style.onActive = other.onActive;
+		style.onHover = other.onHover;
+		style.onFocused = other.onFocused;
+		style.onNormal = other.onNormal;
+
+		return style;
 	}
 }
 

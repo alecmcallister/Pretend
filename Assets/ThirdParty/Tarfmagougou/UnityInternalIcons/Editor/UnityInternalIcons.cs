@@ -20,19 +20,23 @@ namespace tarfmagougou
 		public GUIContent icon;
 		public GUIContent name;
 
-		public override bool Equals(object o) {
+		public override bool Equals(object o)
+		{
 			return o is BuiltinIcon && this.Equals((BuiltinIcon)o);
 		}
 
-		public override int GetHashCode() {
+		public override int GetHashCode()
+		{
 			return name.GetHashCode();
 		}
 
-		public bool Equals(BuiltinIcon o) {
+		public bool Equals(BuiltinIcon o)
+		{
 			return this.name.text == o.name.text;
 		}
 
-		public int CompareTo(BuiltinIcon o) {
+		public int CompareTo(BuiltinIcon o)
+		{
 			return this.name.text.CompareTo(o.name.text);
 		}
 	}
@@ -64,7 +68,8 @@ namespace tarfmagougou
 			_icons.Clear();
 
 			Texture2D[] t = Resources.FindObjectsOfTypeAll<Texture2D>();
-			foreach(Texture2D x in t) {
+			foreach (Texture2D x in t)
+			{
 				if (x.name.Length == 0)
 					continue;
 
@@ -85,7 +90,8 @@ namespace tarfmagougou
 				if (gc.image == null)
 					continue;
 
-				_icons.Add(new BuiltinIcon() {
+				_icons.Add(new BuiltinIcon()
+				{
 					icon = gc,
 					name = new GUIContent(x.name)
 				});
@@ -96,12 +102,13 @@ namespace tarfmagougou
 			System.GC.Collect();
 			Repaint();
 		}
-			
+
 		void OnGUI()
 		{
 			_scroll_pos = EditorGUILayout.BeginScrollView(_scroll_pos);
 			EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
-			if (GUILayout.Button(_refresh_button, EditorStyles.toolbarButton)) {
+			if (GUILayout.Button(_refresh_button, EditorStyles.toolbarButton))
+			{
 				FindIcons();
 			}
 			GUILayout.FlexibleSpace();
@@ -113,12 +120,14 @@ namespace tarfmagougou
 			EditorGUILayout.Space();
 
 			EditorGUIUtility.labelWidth = 100;
-			for (int i = 0; i < _icons.Count; ++i) {
+			for (int i = 0; i < _icons.Count; ++i)
+			{
 				EditorGUILayout.LabelField(_icons[i].icon, _icons[i].name);
 
-				if (GUILayoutUtility.GetLastRect().Contains(Event.current.mousePosition) && Event.current.type == EventType.MouseDown && Event.current.clickCount > 1) {
-					EditorGUIUtility.systemCopyBuffer = _icons[i].name.text;
-					Debug.Log(_icons[i].name.text + " copied to clipboard.");
+				if (GUILayoutUtility.GetLastRect().Contains(Event.current.mousePosition) && Event.current.type == EventType.MouseDown && Event.current.clickCount > 1)
+				{
+					string clipText = "(Texture2D)EditorGUIUtility.IconContent(\"" + _icons[i].name.text + "\").image";
+					EditorGUIUtility.systemCopyBuffer = clipText;
 				}
 			}
 

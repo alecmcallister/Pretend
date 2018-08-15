@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEditor;
 using UnityEditor.AnimatedValues;
 using UnityEngine;
@@ -29,6 +30,7 @@ public class IconSetWindow : EditorWindow
 
 	#region Instance
 
+	[SerializeField]
 	static IconSetWindow _instance;
 	public static IconSetWindow Instance
 	{
@@ -64,40 +66,6 @@ public class IconSetWindow : EditorWindow
 			_toolbarHeight = value;
 		}
 	}
-
-	#endregion
-
-	#region Grid Offset
-
-	//AnimVector3 _offset;
-	//public AnimVector3 Offset
-	//{
-	//	get
-	//	{
-	//		if (_offset == null)
-	//			_offset = new AnimVector3(Vector3.zero);
-	//		if (_offset.valueChanged == null)
-	//			_offset.valueChanged = new UnityEngine.Events.UnityEvent();
-
-	//		return _offset;
-	//	}
-	//}
-
-	//Vector2 _gridOffset;
-	//public Vector2 GridOffset
-	//{
-	//	get
-	//	{
-	//		if (_gridOffset == null)
-	//			_gridOffset = Vector2.zero;
-
-	//		return _gridOffset;
-	//	}
-	//	set
-	//	{
-	//		_gridOffset = value;
-	//	}
-	//}
 
 	#endregion
 
@@ -212,18 +180,25 @@ public class IconSetWindow : EditorWindow
 		wantsMouseMove = true;
 
 		Prefs.Size.valueChanged.AddListener(UpdateVertices);
-		Prefs.GridSpacing.valueChanged.AddListener(Repaint);
-		Prefs.GridDetailLines.valueChanged.AddListener(Repaint);
 
-		//if (!canvas)
-		canvas = CreateInstance(typeof(IconCanvas)) as IconCanvas;
-
-		canvas.Size.valueChanged.AddListener(Repaint);
+		if (!canvas)
+		{
+			canvas = CreateInstance(typeof(IconCanvas)) as IconCanvas;
+			canvas.Size.valueChanged.AddListener(Repaint);
+		}
 	}
 
 	void OnDisable()
 	{
-		Prefs.Save();
+		Prefs.Size.valueChanged.RemoveAllListeners();
+
+		DestroyImmediate(canvas);
+		canvas = null;
+	}
+
+	void OnDestroy()
+	{
+		//Prefs.Save();
 	}
 
 	#endregion
@@ -232,14 +207,12 @@ public class IconSetWindow : EditorWindow
 
 	void OnGUI()
 	{
-		//DrawVertices();
 		DrawGrid();
 		DrawToolbar();
 
 		canvas.ProcessEvents(Event.current);
-		//ProcessVertexEvents(Event.current);
 
-		//PurgeDestroyList();
+		ProcessEvents(Event.current);
 
 		if (GUI.changed)
 			Repaint();
@@ -247,6 +220,11 @@ public class IconSetWindow : EditorWindow
 
 	#endregion
 
+	void ProcessEvents(Event e)
+	{
+		if (e.commandName != "")
+			Debug.Log("Command recognized: " + e.commandName);
+	}
 
 	#region Toolbar
 
@@ -291,11 +269,6 @@ public class IconSetWindow : EditorWindow
 	void TrimGrid()
 	{
 		gridRect.Set(0f, ToolbarHeight - 1f, position.width, position.height - (ToolbarHeight - 1f));
-		//gridRect.center = new Vector2(position.width / 2f, position.height / 2f);
-		//gridRect.position = new Vector2(0f, ToolbarHeight);
-		//gridRect.size = position.size;
-		//gridRect = gridRect.TrimEdge(RectEdge.Top, ToolbarHeight);
-
 		canvas.SetContainerRect(gridRect);
 	}
 
@@ -309,40 +282,6 @@ public class IconSetWindow : EditorWindow
 	void ResetGrid()
 	{
 		canvas.Reset();
-	}
-
-	#region Zoom
-
-	float cameraDistance = 2f;
-	Vector3 pivot = Vector3.zero;
-
-	private void HandleScrollWheel(bool zoomTowardsCenter)
-	{
-		float g = 2.5f;
-
-		float initialDistance = cameraDistance;
-		Vector2 pivotVector = Event.current.mousePosition;
-
-		float zoomDelta = Event.current.delta.y;
-
-		Prefs.GridSpacing.target = Mathf.Abs(Prefs.GridSpacing.value) * (zoomDelta * .015f + 1.0f);
-
-		float percentage = 1f - (cameraDistance / initialDistance);
-		if (!zoomTowardsCenter)
-			canvas.offset += pivotVector * percentage;
-
-		Event.current.Use();
-	}
-
-	#endregion
-
-	#endregion
-
-	#region Events
-
-	void ProcessEvents(Event e)
-	{
-
 	}
 
 	#endregion
@@ -492,7 +431,25 @@ public class SettingsPopup : PopupWindowContent
 
 		#endregion
 
-		if (Event.current.type == EventType.MouseMove)
+		switch (Event.current.type)
+		{
+			case EventType.MouseDown:
+			case EventType.MouseUp:
+			case EventType.MouseMove:
+			case EventType.MouseDrag:
+			case EventType.KeyDown:
+			case EventType.KeyUp:
+			case EventType.ScrollWheel:
+			case EventType.DragUpdated:
+			case EventType.DragPerform:
+			case EventType.DragExited:
+			case EventType.MouseEnterWindow:
+			case EventType.MouseLeaveWindow:
+				editorWindow.Repaint();
+				break;
+		}
+
+		if (GUI.changed)
 		{
 			editorWindow.Repaint();
 		}
@@ -502,11 +459,70 @@ public class SettingsPopup : PopupWindowContent
 
 	#region Draw
 
+	float windowHeight = 350f;
+
+	[SerializeField]
+	static AnimBool _showExtraFields;
+	public static AnimBool ShowExtraFields
+	{
+		get
+		{
+			if (_showExtraFields == null)
+				_showExtraFields = new AnimBool(false);
+			if (_showExtraFields.valueChanged == null)
+				_showExtraFields.valueChanged = new UnityEngine.Events.UnityEvent();
+
+			return _showExtraFields;
+		}
+	}
+
 	void DrawHeader()
 	{
 		EditorGUILayout.BeginVertical(bg);
 		IconSetWindow.Instance.canvas.Size.target = DrawSlider("Size", IconSetWindow.Instance.canvas.Size.target, 0.5f, 2f);
+
+		ShowExtraFields.target = EditorGUILayout.Foldout(ShowExtraFields.target, new GUIContent("Colors"), true);
+		if (EditorGUILayout.BeginFadeGroup(ShowExtraFields.faded))
+		{
+
+			using (EditorGUI.IndentLevelScope m = new EditorGUI.IndentLevelScope())
+			{
+				IconSetWindow.Instance.Prefs.GridBGTint = DrawColorField("BG gradient top", (Color)IconSetWindow.Instance.Prefs.GridBGTint,
+					() => { IconSetWindow.Instance.Prefs.GridBGTint = null; return (Color)IconSetWindow.Instance.Prefs.GridBGTint; });
+
+				IconSetWindow.Instance.Prefs.GridGradientTint = DrawColorField("BG gradient bottom", (Color)IconSetWindow.Instance.Prefs.GridGradientTint,
+					() => { IconSetWindow.Instance.Prefs.GridGradientTint = null; return (Color)IconSetWindow.Instance.Prefs.GridGradientTint; });
+
+				IconSetWindow.Instance.Prefs.GridForeground = DrawColorField("Grid color 1", (Color)IconSetWindow.Instance.Prefs.GridForeground,
+					() => { IconSetWindow.Instance.Prefs.GridForeground = null; return (Color)IconSetWindow.Instance.Prefs.GridForeground; });
+
+				IconSetWindow.Instance.Prefs.GridBackground = DrawColorField("Grid color 2", (Color)IconSetWindow.Instance.Prefs.GridBackground,
+					() => { IconSetWindow.Instance.Prefs.GridBackground = null; return (Color)IconSetWindow.Instance.Prefs.GridBackground; });
+
+				IconSetWindow.Instance.Prefs.GridMajorLineColor = DrawColorField("Major line color", (Color)IconSetWindow.Instance.Prefs.GridMajorLineColor,
+					() => { IconSetWindow.Instance.Prefs.GridMajorLineColor = null; return (Color)IconSetWindow.Instance.Prefs.GridMajorLineColor; });
+
+				IconSetWindow.Instance.Prefs.GridMinorLineColor = DrawColorField("Minor line color", (Color)IconSetWindow.Instance.Prefs.GridMinorLineColor,
+					() => { IconSetWindow.Instance.Prefs.GridMinorLineColor = null; return (Color)IconSetWindow.Instance.Prefs.GridMinorLineColor; });
+			}
+		}
+
+		EditorGUILayout.EndFadeGroup();
 		EditorGUILayout.EndVertical();
+	}
+
+	public void ResetGridForeground()
+	{
+		IconSetWindow.Instance.Prefs.GridForeground = null;
+		IconSetWindow.Instance.Repaint();
+		editorWindow.Repaint();
+	}
+
+	public void ResetGridBackground()
+	{
+		IconSetWindow.Instance.Prefs.GridBackground = null;
+		IconSetWindow.Instance.Repaint();
+		editorWindow.Repaint();
 	}
 
 	float DrawSlider(string name, float val, float min, float max)
@@ -519,18 +535,65 @@ public class SettingsPopup : PopupWindowContent
 		return val;
 	}
 
+	Color DrawColorField(string name, Color val, Func<Color> onDefault = null)
+	{
+		EditorGUI.BeginChangeCheck();
+		EditorGUILayout.BeginHorizontal(header);
+
+		val = EditorGUILayout.ColorField(new GUIContent(name), val, false, true, false, GUILayout.Height(15f));
+
+		if (GUILayout.Button(resetContent, resetStyle))
+		{
+			if (onDefault != null)
+			{
+				val = onDefault.Invoke();
+				GUI.changed = true;
+			}
+		}
+
+		EditorGUILayout.EndHorizontal();
+		if (EditorGUI.EndChangeCheck())
+			IconSetWindow.Instance.Repaint();
+
+		return val;
+	}
+
 	#endregion
 
 	public override Vector2 GetWindowSize()
 	{
-		Vector2 size = new Vector2(300f, 450f);
+		Vector2 size = new Vector2(300f, windowHeight);
 		return size;
 	}
+
+	GUIContent resetContent;
+	GUIStyle resetStyle;
 
 	public override void OnOpen()
 	{
 		if (!init)
 			Init();
+
+		ShowExtraFields.valueChanged.AddListener(editorWindow.Repaint);
+
+		resetContent = EditorGUIUtility.IconContent("d_RotateTool");
+
+		GUIStyle temp = EditorStyles.miniButtonRight;
+		resetStyle = new GUIStyle().ActuallyCopyFrom(temp);
+
+		resetStyle.fixedWidth = resetStyle.fixedHeight = 16f;
+		resetStyle.imagePosition = ImagePosition.ImageOnly;
+		resetStyle.margin = new RectOffset().UniformOffset(0);
+		resetStyle.overflow = new RectOffset().UniformOffset(0);
+		resetStyle.padding = new RectOffset().UniformOffset(3);
+		resetStyle.stretchHeight = false;
+		resetStyle.stretchWidth = false;
+	}
+
+	public override void OnClose()
+	{
+		ShowExtraFields.valueChanged.RemoveAllListeners();
+		//IconSetWindow.Instance.Prefs.Save();
 	}
 
 	#region List of toggle buttons
@@ -559,7 +622,7 @@ public class SettingsPopup : PopupWindowContent
 	{
 		init = true;
 
-		bg = new GUIStyle(GUI.skin.FindStyle("In BigTitle"));
+		bg = new GUIStyle().ActuallyCopyFrom(GUI.skin.FindStyle("In BigTitle"));
 		bg.padding = new RectOffset().UniformOffset(5);
 		bg.margin = new RectOffset();
 
@@ -767,7 +830,10 @@ public class IconCanvas : ScriptableObject
 
 	public bool draggingCanvas;
 
-	Texture2D bgTex;
+	Texture2D gridTex;
+	Texture2D gradientTex;
+	Color defaultBGColor;
+	Color[] gridColors;
 
 	public IconCanvas()
 	{
@@ -780,15 +846,12 @@ public class IconCanvas : ScriptableObject
 		Size.valueChanged.AddListener(OnSizeChanged);
 		gridRect = new Rect();
 
-		bgTex = new Texture2D(2, 2);
-		bgTex.SetPixel(0, 0, new Color(0.1f, 0.1f, 0.1f, 0.2f));
-		bgTex.SetPixel(0, 1, Color.clear);
-		bgTex.SetPixel(1, 1, new Color(0.1f, 0.1f, 0.1f, 0.2f));
-		bgTex.SetPixel(1, 0, Color.clear);
-		bgTex.alphaIsTransparency = true;
-		bgTex.wrapMode = TextureWrapMode.Repeat;
-		bgTex.filterMode = FilterMode.Point;
-		bgTex.Apply();
+		gridTex = Resources.Load("Textures/4x4_TileGrid_White") as Texture2D;
+		gradientTex = Resources.Load("Textures/1x32_Gradient_White") as Texture2D;
+
+		defaultBGColor = Color.HSVToRGB(0f, 0f, 0.22f);
+		gridColors = new Color[16];
+		UpdateGridColors();
 	}
 
 	public void SetContainerRect(Rect trimmed)
@@ -805,7 +868,6 @@ public class IconCanvas : ScriptableObject
 	public void Draw()
 	{
 		DrawGrid();
-		//DrawGlyphs();
 	}
 
 	void CheckOffset()
@@ -830,36 +892,45 @@ public class IconCanvas : ScriptableObject
 		offset.y = y;
 	}
 
+	Color prevColor1;
+	Color prevColor2;
+
+	public void UpdateGridColors()
+	{
+		SetGridColors((Color)IconSetWindow.Instance.Prefs.GridForeground, (Color)IconSetWindow.Instance.Prefs.GridBackground);
+	}
+
+	public void SetGridColors(Color color1, Color color2)
+	{
+		if (color1 == prevColor1 && color2 == prevColor2)
+			return;
+
+		gridColors[0] = gridColors[2] = gridColors[5] = gridColors[7] = gridColors[8] = gridColors[10] = gridColors[13] = gridColors[15] = color1;
+		gridColors[1] = gridColors[3] = gridColors[4] = gridColors[6] = gridColors[9] = gridColors[11] = gridColors[12] = gridColors[14] = color2;
+
+		gridTex.SetPixels(gridColors);
+		gridTex.Apply();
+	}
+
 	void DrawGrid()
 	{
+		UpdateGridColors();
+
 		CheckOffset();
 		CalculateGridRect();
-		Color c = new Color(0.1f, 0.1f, 0.1f);
-		DrawBackground(gridRect, c, 0.6f, 5f * Size.value);
+		float border = 5f * Size.value;
 
-		//GUI.DrawTexture(container, BGTex, ScaleMode.ScaleAndCrop);
-		//GUI.DrawTextureWithTexCoords(container, BGTex, new Rect(container.position, new Vector2(container.width / gridRect.width, container.height / gridRect.height) * Size.value));
+		DrawBackground(gridRect, (Color)IconSetWindow.Instance.Prefs.GridBGTint, border);
 
-		//Vector2 pos = Vector3.Scale((gridRect.center / sizeVal), new Vector2(-1f, 1f));
-		//Vector2 pos = (container.center + offset) / sizeVal;
-		//Vector2 pos = (gridRect.position / sizeVal) - (offset / sizeVal);
-		//Vector2 pos = (gridRect.position / sizeVal) - offset / sizeVal;
-
-		//Vector2 pos = (offset / sizeVal) + (gridRect.size / sizeVal);
-		//pos.x = -pos.x;
-		//pos.y = -pos.y;
-
-		//Vector2 size = container.size / sizeVal;
-		//GUI.DrawTextureWithTexCoords(container, BGTex, new Rect(pos, size));
-
-		int pow = 4;
-		float val = 3f * Mathf.Pow(2f, pow);
+		GUI.DrawTexture(container, gradientTex, ScaleMode.StretchToFill, true, 0, (Color)IconSetWindow.Instance.Prefs.GridGradientTint, 0, 0);
+		DrawRectWithBorder(gridRect, defaultBGColor, 1f, border);
 
 		float sizeVal = gridWidth * Size.value;
-		GUI.DrawTextureWithTexCoords(gridRect, bgTex, new Rect(Vector2.zero, val * gridRect.size / sizeVal));
 
-		DrawGridRect(gridRect, 24, Color.grey, 0.3f);
-		DrawGridRect(gridRect, 6, Color.grey, 0.6f);
+		GUI.DrawTextureWithTexCoords(gridRect, gridTex, new Rect(Vector2.zero, 24f * gridRect.size / sizeVal));
+
+		DrawGridRect(gridRect, 24, (Color)IconSetWindow.Instance.Prefs.GridMinorLineColor, 2f);
+		DrawGridRect(gridRect, 6, (Color)IconSetWindow.Instance.Prefs.GridMajorLineColor, 3f);
 	}
 
 	void CalculateGridRect()
@@ -868,79 +939,52 @@ public class IconCanvas : ScriptableObject
 		gridRect.Set(center.x - (size / 2f), center.y - (size / 2f), size, size);
 	}
 
-	void DrawBackground(Rect exclude, Color color, float alpha, float border = 0f)
+	void DrawRectWithBorder(Rect rect, Color color, float alpha, float border)
+	{
+		Color bg = new Color(color.r, color.g, color.b, alpha);
+
+		Rect bordered = new Rect(rect);
+		bordered.min -= Vector2.one * border;
+		bordered.max += Vector2.one * border;
+
+		EditorGUI.DrawRect(bordered, bg);
+	}
+
+	void DrawBackground(Rect exclude, Color color, float border = 0f)
 	{
 		backgroundRects[0].Set(container.x, container.y, exclude.xMin - border, container.height); // Left
 		backgroundRects[1].Set(exclude.xMax + border, container.y, container.xMax - exclude.xMax - border, container.height); // Right
 		backgroundRects[2].Set(exclude.xMin - border, container.y, exclude.width + border + border, exclude.yMin - container.yMin - border); // Top
 		backgroundRects[3].Set(exclude.xMin - border, exclude.yMax + border, exclude.width + border + border, container.yMax - exclude.yMax - border); // Bottom
 
-		Color bg = new Color(color.r, color.g, color.b, alpha);
 		for (int i = 0; i < 4; i++)
-			EditorGUI.DrawRect(backgroundRects[i], bg);
+			EditorGUI.DrawRect(backgroundRects[i], color);
 	}
 
-	void DrawGridRect(Rect grid, int dp, Color color, float alpha)
+	void DrawGridRect(Rect grid, int dp, Color color, float width)
 	{
-		Handles.BeginGUI();
-		Handles.color = new Color(color.r, color.g, color.b, alpha);
-
-		float spacing = grid.width / dp;
-
-		Vector3 from = new Vector3(grid.x, grid.yMin);
-		Vector3 to = new Vector3(grid.x, grid.yMax);
-
-		for (int x = 0; x <= dp; x++)
+		using (Handles.DrawingScope d = new Handles.DrawingScope(color))
 		{
-			Handles.DrawLine(from, to);
-			from.x += spacing;
-			to.x += spacing;
+			Handles.BeginGUI();
+			float spacing = grid.width / dp;
+			Vector3 from = new Vector3(grid.x, grid.yMin);
+			Vector3 to = new Vector3(grid.x, grid.yMax);
+			for (int x = 0; x <= dp; x++)
+			{
+				Handles.DrawAAPolyLine(width, from, to);
+				from.x += spacing;
+				to.x += spacing;
+			}
+			from = new Vector3(grid.xMin, grid.y);
+			to = new Vector3(grid.xMax, grid.y);
+			for (int y = 0; y <= dp; y++)
+			{
+				Handles.DrawAAPolyLine(width, from, to);
+				from.y += spacing;
+				to.y += spacing;
+			}
+			Handles.EndGUI();
 		}
-
-		from = new Vector3(grid.xMin, grid.y);
-		to = new Vector3(grid.xMax, grid.y);
-
-		for (int y = 0; y <= dp; y++)
-		{
-			Handles.DrawLine(from, to);
-			from.y += spacing;
-			to.y += spacing;
-		}
-
-		Handles.color = Color.white;
-		Handles.EndGUI();
-	}
-
-	void DrawGridCenter(int dp, float size, Color color, float alpha)
-	{
-		Handles.BeginGUI();
-		Handles.color = new Color(color.r, color.g, color.b, alpha);
-
-		int hdp = dp / 2;
-		float spacing = size / dp;
-
-		Vector3 from = new Vector3(center.x - (hdp * spacing), center.y - (hdp * spacing));
-		Vector3 to = new Vector3(center.x - (hdp * spacing), center.y + (hdp * spacing));
-
-		for (int x = 0; x <= dp; x++)
-		{
-			Handles.DrawLine(from, to);
-			from.x += spacing;
-			to.x += spacing;
-		}
-
-		from = new Vector3(center.x - (hdp * spacing), center.y - (hdp * spacing));
-		to = new Vector3(center.x + (hdp * spacing), center.y - (hdp * spacing));
-
-		for (int y = 0; y <= dp; y++)
-		{
-			Handles.DrawLine(from, to);
-			from.y += spacing;
-			to.y += spacing;
-		}
-
-		Handles.color = Color.white;
-		Handles.EndGUI();
 	}
 
 	bool MouseOverGrid()

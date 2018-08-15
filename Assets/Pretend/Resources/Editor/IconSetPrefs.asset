@@ -12,14 +12,12 @@ MonoBehaviour:
   m_Name: IconSetPrefs
   m_EditorClassIdentifier: 
   _size:
-    m_Target: 0
-    speed: 0
+    m_Target: 20
+    speed: 2
     m_Value: 0
-  _gridSpacing:
-    m_Target: 0
-    speed: 0
-    m_Value: 0
-  _gridDetailLines:
-    m_Target: 0
-    speed: 0
-    m_Value: 0
+  _gridGradientTint: {r: 0.6603774, g: 0.24608402, b: 0.24608402, a: 1}
+  _gridBGTint: {r: 0.2706924, g: 0.7264151, b: 0.69389534, a: 1}
+  _gridMajorLineColor: {r: 0.6, g: 0.6, b: 0.6, a: 0.79607844}
+  _gridMinorLineColor: {r: 0.5, g: 0.5, b: 0.5, a: 0.20392157}
+  _gridForeground: {r: 0.1, g: 0.1, b: 0.1, a: 0.2}
+  _gridBackground: {r: 0, g: 0, b: 0, a: 0}
