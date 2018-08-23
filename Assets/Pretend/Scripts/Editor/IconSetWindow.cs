@@ -210,6 +210,7 @@ public class IconSetWindow : EditorWindow
 		DrawGrid();
 		DrawToolbar();
 
+		canvas.points.ForEach(p => p.ProcessEvents(Event.current));
 		canvas.ProcessEvents(Event.current);
 
 		ProcessEvents(Event.current);
@@ -734,31 +735,35 @@ public abstract class IconGridElement : ScriptableObject, IIconGridElement
 
 	#endregion
 
-	public Rect rect { get; set; }
-	public Vector2 position { get; set; }
-	public Vector2 localPosition { get; set; }
+	public Rect rect;
+	public Vector2 localPosition;
+
 	public bool hovered { get { return rect.Contains(Event.current.mousePosition); } }
 
 	public bool dirty { get; set; }
 
 	public IconGridElement()
 	{
-		rect = new Rect();
-		position = Vector2.zero;
-		localPosition = Vector2.zero;
+		rect = new Rect(0f, 0f, 70f, 70f);
 	}
 
 	public virtual void Draw()
 	{
-		GUI.Box(rect, "", Style[hovered ? 1 : 0]);
+		Rect drawn = new Rect(rect);
+		drawn.position -= drawn.size / 2f;
+		GUI.Box(drawn, "", Style[hovered ? 1 : 0]);
 		EditorGUIUtility.AddCursorRect(rect, MouseCursor.MoveArrow);
 	}
 
 	public virtual void SetPosition(Vector2 pos)
 	{
-		position = pos;
+		rect.position = pos;
 	}
 
+	/// <summary>
+	/// Should be a normalized value
+	/// </summary>
+	/// <param name="pos"></param>
 	public virtual void SetLocalPosition(Vector2 pos)
 	{
 		localPosition = pos;
@@ -766,9 +771,13 @@ public abstract class IconGridElement : ScriptableObject, IIconGridElement
 
 	public virtual void Move(Vector2 delta)
 	{
-		position += delta;
+		rect.position += delta;
 	}
 
+	/// <summary>
+	/// CHANGE TO REFLECT THE ELEMENTS POSITION IN LOCAL GRID SPACE
+	/// </summary>
+	/// <param name="delta"></param>
 	public virtual void MoveLocal(Vector2 delta)
 	{
 		localPosition += delta;
@@ -776,7 +785,7 @@ public abstract class IconGridElement : ScriptableObject, IIconGridElement
 
 	public virtual void Snap(IIconGridSnapTarget target)
 	{
-		localPosition = target.GetSnapPoint();
+		rect.position = target.GetSnapPoint();
 	}
 }
 
@@ -863,6 +872,8 @@ public class IconCanvas : ScriptableObject
 	{
 		SetOffset(Vector2.zero);
 		Size.target = Size.value = 1f;
+		if (points != null)
+			points.Clear();
 	}
 
 	public void Draw()
@@ -931,6 +942,8 @@ public class IconCanvas : ScriptableObject
 
 		DrawGridRect(gridRect, 24, (Color)IconSetWindow.Instance.Prefs.GridMinorLineColor, 2f);
 		DrawGridRect(gridRect, 6, (Color)IconSetWindow.Instance.Prefs.GridMajorLineColor, 3f);
+
+		DrawPoints(gridRect);
 	}
 
 	void CalculateGridRect()
@@ -1015,15 +1028,15 @@ public class IconCanvas : ScriptableObject
 
 	public void DrawGlyphs()
 	{
-		foreach (IconGlyph glyph in glyphs)
-		{
-			glyph.Draw();
-		}
+		if (Glyph != null)
+			Glyph.Draw();
 	}
 
 	public void Move(Vector2 delta)
 	{
 		offset += delta;
+		if (Glyph != null)
+			Glyph.Move(delta);
 		//glyphs.ForEach(g => g.Move(delta));
 	}
 
@@ -1036,6 +1049,8 @@ public class IconCanvas : ScriptableObject
 	public void SetPosition(Vector2 pos)
 	{
 		position = pos;
+		if (Glyph != null)
+			Glyph.SetPosition(pos);
 		// do something to the glyphs
 	}
 
@@ -1048,6 +1063,8 @@ public class IconCanvas : ScriptableObject
 	public void SetOffset(Vector2 offset)
 	{
 		this.offset = offset;
+		if (Glyph != null)
+			Glyph.SetPosition(offset);
 	}
 
 	#region Events
@@ -1083,6 +1100,19 @@ public class IconCanvas : ScriptableObject
 		{
 			draggingCanvas = true;
 		}
+		if (e.button == 1)
+		{
+			//if (Glyph == null)
+			//{
+			//	ShowContextMenu(e.mousePosition);
+			//}
+			//else
+			//{
+			//	Glyph.AddVertex(CreateVertex(e.mousePosition));
+			//}
+
+			AddPoint(e.mousePosition);
+		}
 
 		GUI.changed = true;
 	}
@@ -1112,11 +1142,9 @@ public class IconCanvas : ScriptableObject
 
 	void ShowContextMenu(Vector2 pos)
 	{
-		//GenericMenu generic = new GenericMenu();
-		//generic.AddItem(new GUIContent("Add Vertex"), false, () => { CreateVertex(pos); });
-		//generic.ShowAsContext();
-
-		//CreateVertex(pos);
+		GenericMenu generic = new GenericMenu();
+		generic.AddItem(new GUIContent("Add Glyph"), false, () => { AddGlyph(pos); });
+		generic.ShowAsContext();
 	}
 
 	float zoomSensitivity = 1f;
@@ -1146,44 +1174,141 @@ public class IconCanvas : ScriptableObject
 
 	#endregion
 
+	#region Glyph stuff
+
+	public IconGlyph Glyph;
+
+	public void AddGlyph(Vector2 pos)
+	{
+		if (Glyph != null)
+			RemoveGlyph();
+
+		Glyph = CreateInstance(typeof(IconGlyph)) as IconGlyph;
+		Glyph.Move(pos);
+	}
+
+	public void RemoveGlyph()
+	{
+		DestroyImmediate(Glyph);
+	}
+
+	IIconGridElement CreateVertex(Vector2 pos)
+	{
+		IconPoint p = CreateInstance(typeof(IconPoint)) as IconPoint;
+		p.SetPosition(pos);
+		return p;
+	}
+
+	Vector2 origin = Vector2.zero;
+	public List<IconPoint> points = new List<IconPoint>();
+
+	public void DrawPoints(Rect canvas)
+	{
+		foreach (IconPoint point in points)
+		{
+			Vector2 pos = canvas.position + new Vector2(canvas.width * point.localPosition.x, canvas.height * point.localPosition.y);
+			float pointSize = canvas.width / 50f;
+			//Rect pointRect = new Rect(pos.x, pos.y, pointSize, pointSize);
+
+			point.rect.Set(pos.x, pos.y, pointSize, pointSize);
+			point.Draw();
+		}
+	}
+
+	public void AddPoint(Vector2 pos)
+	{
+		IconPoint point = CreateInstance(typeof(IconPoint)) as IconPoint;
+		point.SetLocalPosition(GetLocalPositionOnCanvas(gridRect, pos));
+		points.Add(point);
+	}
+
+	public Vector2 GetLocalPositionOnCanvas(Rect canvas, Vector2 pos)
+	{
+		pos -= canvas.position;
+		return new Vector2(pos.x / canvas.width, pos.y / canvas.height);
+	}
+
+	public Vector2 GetLocalPositionOnGrid(Vector2 pos)
+	{
+		return GetLocalPositionOnCanvas(gridRect, pos);
+	}
+
+	public Vector2 GetLocalMousePositionOnGrid()
+	{
+		return GetLocalPositionOnCanvas(gridRect, Event.current.mousePosition);
+	}
+
+	#endregion
+
 }
 
 [Serializable]
 public class IconGlyph : IconGridElement
 {
-	public List<IIconGridElement> vertices;
+	public List<IIconGridElement> points;
 	public Vector2 origin;
 
 	public IconGlyph()
 	{
-		vertices = new List<IIconGridElement>();
+		points = new List<IIconGridElement>();
 	}
 
 	public override void Draw()
 	{
-		foreach (IIconGridElement vertex in vertices)
+		foreach (IIconGridElement point in points)
 		{
-			vertex.Draw();
+			point.Draw();
 		}
 	}
 
-	public void AddVertex(IIconGridElement vertex)
+	public void AddVertex(IIconGridElement point)
 	{
-		vertices.Add(vertex);
+		points.Add(point);
 	}
 
-	public void RemoveVertex(IIconGridElement vertex)
+	public void RemoveVertex(IIconGridElement point)
 	{
-		vertices.Remove(vertex);
+		points.Remove(point);
 	}
 
 	public override void Move(Vector2 delta)
 	{
-		vertices.ForEach(v => v.Move(delta));
+		points.ForEach(v => v.Move(delta));
 	}
 
 	public override void MoveLocal(Vector2 delta)
 	{
-		vertices.ForEach(v => v.MoveLocal(delta));
+		points.ForEach(v => v.MoveLocal(delta));
 	}
+}
+
+public class IconPoint : IconGridElement
+{
+	public void ProcessEvents(Event e)
+	{
+		switch (e.type)
+		{
+			//case EventType.KeyDown:
+			//case EventType.KeyUp:
+			//	dirty = true;
+			//	break;
+
+			//case EventType.MouseMove:
+			//	MouseMove(e);
+			//	break;
+
+			//case EventType.MouseDown:
+			//	MouseDown(e);
+			//	break;
+
+			//case EventType.MouseUp:
+			//	MouseUp(e);
+			//	break;
+
+			//case EventType.MouseDrag:
+			//	MouseDrag(e);
+			//	break;
+		}
+	}
+
 }
