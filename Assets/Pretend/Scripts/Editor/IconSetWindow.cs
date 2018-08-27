@@ -209,6 +209,9 @@ public class IconSetWindow : EditorWindow
 	void OnGUI()
 	{
 		DrawGrid();
+
+		DrawGuideRulers();
+
 		DrawToolbar();
 
 		for (int i = canvas.points.Count - 1; i >= 0; i--)
@@ -268,11 +271,60 @@ public class IconSetWindow : EditorWindow
 
 	#endregion
 
+	#region Guide rulers
+
+	float rulerSize = 25f;
+
+	GUIStyle _rulerStyle;
+	public GUIStyle RulerStyle
+	{
+		get
+		{
+			if (_rulerStyle == null)
+			{
+				_rulerStyle = new GUIStyle();
+				_rulerStyle.normal.background = (Texture2D)EditorGUIUtility.IconContent("CN Box@2x").image;
+				//_rulerStyle.hover.background = (Texture2D)EditorGUIUtility.IconContent("CN Box@2x").image;
+			}
+
+			return _rulerStyle;
+		}
+	}
+
+	/// <summary>
+	/// Move to separate class
+	/// </summary>
+	void DrawGuideRulers()
+	{
+		Rect leftRuler = new Rect(0f, gridTrimTop + rulerSize, rulerSize, position.height - gridTrimTop);
+		//GUI.Box(leftRuler, "", RulerStyle);
+		EditorGUI.DrawRect(leftRuler, Color.black.WithAlpha(0.2f));
+	}
+
+
+	#endregion
+
 	#region Grid
+
+	float gridTrimTop
+	{
+		get
+		{
+			return (ToolbarHeight - 1f);
+		}
+	}
+
+	float gridTrimLeft
+	{
+		get
+		{
+			return rulerSize;
+		}
+	}
 
 	void TrimGrid()
 	{
-		gridRect.Set(0f, ToolbarHeight - 1f, position.width, position.height - (ToolbarHeight - 1f));
+		gridRect.Set(gridTrimLeft, gridTrimTop, position.width - gridTrimLeft, position.height - gridTrimTop);
 		canvas.SetContainerRect(gridRect);
 	}
 
@@ -729,10 +781,10 @@ public abstract class IconGridElement : ScriptableObject, IIconGridElement
 			if (_style == null)
 			{
 				_style = new GUIStyle();
-				_style.normal.background = (Texture2D)EditorGUIUtility.IconContent("slider thumb@2x").image;
-				_style.hover.background = (Texture2D)EditorGUIUtility.IconContent("slider thumb act@2x").image;
-				_style.normal.scaledBackgrounds = new Texture2D[] { (Texture2D)EditorGUIUtility.IconContent("slider thumb@2x").image };
-				_style.hover.scaledBackgrounds = new Texture2D[] { (Texture2D)EditorGUIUtility.IconContent("slider thumb act@2x").image };
+				//_style.normal.background = (Texture2D)EditorGUIUtility.IconContent("slider thumb@2x").image;
+				//_style.hover.background = (Texture2D)EditorGUIUtility.IconContent("slider thumb act@2x").image;
+				_style.normal.background = Resources.Load<Texture2D>("Editor/Textures/point_normal");
+				_style.hover.background = Resources.Load<Texture2D>("Editor/Textures/point_active");
 			}
 			return _style;
 		}
@@ -757,7 +809,7 @@ public abstract class IconGridElement : ScriptableObject, IIconGridElement
 
 	public IconGridElement()
 	{
-		rect = new Rect(0f, 0f, 70f, 70f);
+		rect = new Rect(0f, 0f, 50f, 50f);
 	}
 
 	public virtual void Draw()
@@ -833,7 +885,6 @@ public class IconCanvas : ScriptableObject
 	const float checkVal = 280f;
 
 	Vector2 center { get { return container.center + offset; } }
-	Rect[] backgroundRects = new Rect[] { new Rect(), new Rect(), new Rect(), new Rect() };
 
 	AnimFloat _size;
 	public AnimFloat Size
@@ -946,13 +997,11 @@ public class IconCanvas : ScriptableObject
 		CheckOffset();
 		CalculateGridRect();
 		float border = 5f * Size.value;
+		float sizeVal = gridWidth * Size.value;
 
-		DrawBackground(gridRect, (Color)IconSetWindow.Instance.Prefs.GridBGTint, border);
-
+		EditorGUI.DrawRect(container, (Color)IconSetWindow.Instance.Prefs.GridBGTint);
 		GUI.DrawTexture(container, gradientTex, ScaleMode.StretchToFill, true, 0, (Color)IconSetWindow.Instance.Prefs.GridGradientTint, 0, 0);
 		DrawRectWithBorder(gridRect, defaultBGColor, 1f, border);
-
-		float sizeVal = gridWidth * Size.value;
 
 		GUI.DrawTextureWithTexCoords(gridRect, gridTex, new Rect(Vector2.zero, cells * gridRect.size / sizeVal));
 
@@ -975,17 +1024,6 @@ public class IconCanvas : ScriptableObject
 		bordered.max += Vector2.one * border;
 
 		EditorGUI.DrawRect(bordered, bg);
-	}
-
-	void DrawBackground(Rect exclude, Color color, float border = 0f)
-	{
-		backgroundRects[0].Set(container.x, container.y, exclude.xMin - border, container.height); // Left
-		backgroundRects[1].Set(exclude.xMax + border, container.y, container.xMax - exclude.xMax - border, container.height); // Right
-		backgroundRects[2].Set(exclude.xMin - border, container.y, exclude.width + border + border, exclude.yMin - container.yMin - border); // Top
-		backgroundRects[3].Set(exclude.xMin - border, exclude.yMax + border, exclude.width + border + border, container.yMax - exclude.yMax - border); // Bottom
-
-		for (int i = 0; i < 4; i++)
-			EditorGUI.DrawRect(backgroundRects[i], color);
 	}
 
 	void DrawGridRect(Rect grid, int dp, Color color, float width)

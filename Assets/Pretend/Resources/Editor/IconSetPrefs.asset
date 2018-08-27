@@ -16,8 +16,8 @@ MonoBehaviour:
     speed: 2
     m_Value: 0
   _gridGradientTint: {r: 0.1, g: 0.1, b: 0.1, a: 1}
-  _gridBGTint: {r: 0, g: 0, b: 0, a: 0}
+  _gridBGTint: {r: 0.8207547, g: 0.29036134, b: 0.29036134, a: 0.56078434}
   _gridMajorLineColor: {r: 0.5, g: 0.5, b: 0.5, a: 0.6}
   _gridMinorLineColor: {r: 0.5, g: 0.5, b: 0.5, a: 0.3}
   _gridForeground: {r: 0.1, g: 0.1, b: 0.1, a: 0.2}
-  _gridBackground: {r: 0, g: 0, b: 0, a: 0}
+  _gridBackground: {r: 0, g: 0, b: 0, a: 0.24313726}
