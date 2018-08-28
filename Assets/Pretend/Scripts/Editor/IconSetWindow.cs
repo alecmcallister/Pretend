@@ -21,7 +21,7 @@ public class IconSetWindow : EditorWindow
 	#region Variables & properties
 
 	Rect settingsDropdownRect;
-	Rect gridRect;
+	Rect canvasRect;
 	public IconCanvas canvas;
 
 	#endregion
@@ -56,10 +56,10 @@ public class IconSetWindow : EditorWindow
 	{
 		get
 		{
-			if (_toolbarHeight < 0)
+			if (_toolbarHeight - 1 < 0)
 				_toolbarHeight = EditorStyles.toolbarButton.CalcSize(new GUIContent("Settings")).y;
 
-			return _toolbarHeight;
+			return _toolbarHeight - 1;
 		}
 		set
 		{
@@ -91,38 +91,6 @@ public class IconSetWindow : EditorWindow
 
 	#endregion
 
-	#region Vertices
-
-	List<List<IconVertex>> _shapes;
-	public List<List<IconVertex>> Shapes
-	{
-		get
-		{
-			if (_shapes == null)
-				_shapes = new List<List<IconVertex>>();
-
-			return _shapes;
-		}
-	}
-
-	List<IconVertex> _vertices;
-	public List<IconVertex> Vertices
-	{
-		get
-		{
-			if (_vertices == null)
-				_vertices = new List<IconVertex>();
-
-			return _vertices;
-		}
-		set
-		{
-			_vertices = value;
-		}
-	}
-
-	#endregion
-
 	#region Content
 
 	GUIContent _clearVerticesContent;
@@ -131,7 +99,7 @@ public class IconSetWindow : EditorWindow
 		get
 		{
 			if (_clearVerticesContent == null)
-				_clearVerticesContent = new GUIContent("Clear Vertices");
+				_clearVerticesContent = new GUIContent("Clear Points");
 			return _clearVerticesContent;
 		}
 	}
@@ -180,7 +148,7 @@ public class IconSetWindow : EditorWindow
 		wantsMouseMove = true;
 		wantsMouseEnterLeaveWindow = true;
 
-		Prefs.Size.valueChanged.AddListener(UpdateVertices);
+		Prefs.DrawRulers.valueChanged.AddListener(Repaint);
 
 		if (!canvas)
 		{
@@ -191,8 +159,6 @@ public class IconSetWindow : EditorWindow
 
 	void OnDisable()
 	{
-		Prefs.Size.valueChanged.RemoveAllListeners();
-
 		DestroyImmediate(canvas);
 		canvas = null;
 	}
@@ -210,7 +176,8 @@ public class IconSetWindow : EditorWindow
 	{
 		DrawGrid();
 
-		DrawGuideRulers();
+		if (Prefs.DrawRulers.value)
+			DrawGuideRulers();
 
 		DrawToolbar();
 
@@ -229,9 +196,15 @@ public class IconSetWindow : EditorWindow
 
 	void ProcessEvents(Event e)
 	{
+		if (e.type == EventType.MouseMove || e.type == EventType.MouseEnterWindow || e.type == EventType.MouseLeaveWindow)
+			GUI.changed = true;
+
 		if (e.commandName != "")
 			Debug.Log("Command recognized: " + e.commandName);
+
 	}
+
+
 
 	#region Toolbar
 
@@ -240,25 +213,21 @@ public class IconSetWindow : EditorWindow
 		GUILayout.BeginHorizontal(EditorStyles.toolbar);
 
 		if (GUILayout.Button(ClearVerticesContent, EditorStyles.toolbarButton))
-		{
-			DeleteAllVertices();
-		}
+			canvas.ClearPoints();
 
 		if (GUILayout.Button(ResetGridContent, EditorStyles.toolbarButton))
-		{
-			ResetGrid();
-		}
+			canvas.Reset();
 
 		GUILayout.Space(5f);
-		GUILayout.Label(" (" + canvas.offset.x.ToString("0.0") + ", " + canvas.offset.y.ToString("0.0") + ") ", EditorStyles.toolbarTextField);
+
+		Vector2 localMouse = canvas.GetLocalMousePositionOnGrid() * 24f;
+		string mousePosText = canvasRect.Contains(Event.current.mousePosition) ? " (" + localMouse.x.ToString("0.0") + ", " + localMouse.y.ToString("0.0") + ") " : "";
+
+		GUILayout.Label(mousePosText, EditorStyles.toolbarTextField);
 		GUILayout.FlexibleSpace();
 
-		// Dropdown
 		if (EditorGUILayout.DropdownButton(SettingsContent, FocusType.Passive, EditorStyles.toolbarDropDown))
-		{
-			// Show custom dropdown window
 			PopupWindow.Show(settingsDropdownRect, new SettingsPopup());
-		}
 
 		if (Event.current.type == EventType.Repaint)
 		{
@@ -273,7 +242,13 @@ public class IconSetWindow : EditorWindow
 
 	#region Guide rulers
 
-	float rulerSize = 25f;
+	float rulerSize
+	{
+		get
+		{
+			return Prefs.DrawRulers.value ? 16f : 0f;
+		}
+	}
 
 	GUIStyle _rulerStyle;
 	public GUIStyle RulerStyle
@@ -283,11 +258,69 @@ public class IconSetWindow : EditorWindow
 			if (_rulerStyle == null)
 			{
 				_rulerStyle = new GUIStyle();
-				_rulerStyle.normal.background = (Texture2D)EditorGUIUtility.IconContent("CN Box@2x").image;
-				//_rulerStyle.hover.background = (Texture2D)EditorGUIUtility.IconContent("CN Box@2x").image;
+				_rulerStyle.normal.background = Resources.Load<Texture2D>("Editor/Textures/guide_border");
+				_rulerStyle.border = new RectOffset().UniformOffset(_rulerStyle.normal.background.width / 2);
 			}
 
 			return _rulerStyle;
+		}
+	}
+
+	GUIStyle _rulerTextStyleL;
+	public GUIStyle RulerTextStyleL
+	{
+		get
+		{
+			if (_rulerTextStyleL == null)
+			{
+				_rulerTextStyleL = new GUIStyle();
+				_rulerTextStyleL.fontSize = 5;
+				_rulerTextStyleL.alignment = TextAnchor.UpperLeft;
+				_rulerTextStyleL.wordWrap = false;
+				_rulerTextStyleL.clipping = TextClipping.Clip;
+			}
+			return _rulerTextStyleL;
+		}
+	}
+
+	GUIStyle _rulerTextStyleT;
+	public GUIStyle RulerTextStyleT
+	{
+		get
+		{
+			if (_rulerTextStyleT == null)
+			{
+				_rulerTextStyleT = new GUIStyle();
+				_rulerTextStyleT.fontSize = 5;
+				_rulerTextStyleT.alignment = TextAnchor.UpperLeft;
+				_rulerTextStyleT.wordWrap = false;
+				_rulerTextStyleT.clipping = TextClipping.Clip;
+			}
+			return _rulerTextStyleT;
+		}
+	}
+
+	Texture _guideCursorL;
+	public Texture GuideCursorL
+	{
+		get
+		{
+			if (_guideCursorL == null)
+				_guideCursorL = Resources.Load<Texture2D>("Editor/Textures/guide_cursor_left");
+
+			return _guideCursorL;
+		}
+	}
+
+	Texture _guideCursorT;
+	public Texture GuideCursorT
+	{
+		get
+		{
+			if (_guideCursorT == null)
+				_guideCursorT = Resources.Load<Texture2D>("Editor/Textures/guide_cursor_top");
+
+			return _guideCursorT;
 		}
 	}
 
@@ -296,11 +329,138 @@ public class IconSetWindow : EditorWindow
 	/// </summary>
 	void DrawGuideRulers()
 	{
-		Rect leftRuler = new Rect(0f, gridTrimTop + rulerSize, rulerSize, position.height - gridTrimTop);
-		//GUI.Box(leftRuler, "", RulerStyle);
-		EditorGUI.DrawRect(leftRuler, Color.black.WithAlpha(0.2f));
-	}
+		bool sideways = false;
 
+		Rect textRect = new Rect();
+
+		Rect leftRuler = new Rect(0f, ToolbarHeight + rulerSize, rulerSize, position.height - ToolbarHeight - rulerSize);
+		Rect topRuler = new Rect(rulerSize, ToolbarHeight, position.width - rulerSize, rulerSize);
+		Rect cornerPiece = new Rect(0f, ToolbarHeight, rulerSize, rulerSize);
+		GUI.Box(leftRuler, "", RulerStyle);
+		GUI.Box(topRuler, "", RulerStyle);
+		GUI.Box(cornerPiece, "", RulerStyle);
+
+		Color majorLineColor = Color.white;
+		Color minorLineColor = Color.white.WithAlpha(0.5f);
+
+		Handles.BeginGUI();
+		float borderL = 6f;
+		float borderS = 4f;
+
+		bool major;
+		int m = 0;
+		int majorCells = canvas.cells / canvas.outerCells;
+
+		float interval = canvas.gridRect.height / canvas.cells;
+
+		float yMin = ToolbarHeight + rulerSize + borderS;
+		float yMax = position.height - borderS;
+
+		float xMin = rulerSize + borderS;
+		float xMax = position.width - borderS;
+
+		Vector2 p1 = new Vector2(borderS, 0f);
+		Vector2 p2 = new Vector2(rulerSize - borderS, 0f);
+
+		float y = canvas.gridRect.position.y;
+		float x = canvas.gridRect.position.x;
+
+		if (y > yMin)
+		{
+			while (y > yMin + interval)
+			{
+				y -= interval;
+				m--;
+			}
+		}
+		else
+		{
+			while (y < yMin)
+			{
+				y += interval;
+				m++;
+			}
+		}
+
+		while (y < yMax)
+		{
+			major = m++ % majorCells == 0;
+			Handles.color = RulerTextStyleL.normal.textColor = major ? majorLineColor : minorLineColor;
+
+			p2.x = rulerSize - (major ? borderS : borderL);
+
+			p1.y = p2.y = y;
+			Handles.DrawLine(p1, p2);
+
+			if (!sideways)
+			{
+				textRect.Set(borderS, y + 1f, rulerSize - borderS - borderS, interval - 1f);
+				GUI.Label(textRect, (m - 1).ToString(), RulerTextStyleL);
+			}
+			else
+			{
+				textRect.Set(2f, y + borderS, interval, rulerSize);
+				GUIUtility.RotateAroundPivot(-90f, new Vector2(0f, y));
+
+				GUI.Label(textRect, (m - 1).ToString(), RulerTextStyleL);
+
+				GUIUtility.RotateAroundPivot(90f, new Vector2(0f, y));
+			}
+
+			y += interval;
+		}
+
+		m = 0;
+		p1.y = ToolbarHeight + borderS;
+		p2.y = gridTrimTop - borderS;
+
+		if (x > xMin)
+		{
+			while (x > xMin + interval)
+			{
+				x -= interval;
+				m--;
+			}
+		}
+		else
+		{
+			while (x < xMin)
+			{
+				x += interval;
+				m++;
+			}
+		}
+
+		while (x < xMax)
+		{
+			major = m++ % majorCells == 0;
+			Handles.color = RulerTextStyleT.normal.textColor = major ? majorLineColor : minorLineColor;
+
+			p2.y = gridTrimTop - (major ? borderS : borderL);
+
+			p1.x = p2.x = x;
+			Handles.DrawLine(p1, p2);
+
+			textRect.Set(x + 2f, ToolbarHeight + borderS, interval - 2f, rulerSize - borderS - borderS);
+			GUI.Label(textRect, (m - 1).ToString(), RulerTextStyleT);
+
+			x += interval;
+		}
+
+		Handles.color = Color.white;
+		Vector2 mPos = Event.current.mousePosition;
+
+		Vector3 startL = new Vector3(rulerSize - borderS, mPos.y);
+		Vector3 startT = new Vector3(mPos.x, gridTrimTop - borderS);
+
+		Vector3[] pointsL = new Vector3[] { startL, new Vector3(startL.x - 5f, startL.y + 5f), new Vector3(startL.x - 5f, startL.y - 5f), startL };
+		Vector3[] pointsT = new Vector3[] { startT, new Vector3(startT.x + 5f, startT.y - 5f), new Vector3(startT.x - 5f, startT.y - 5f), startT };
+
+		Handles.DrawAAPolyLine(pointsL);
+		Handles.DrawAAPolyLine(pointsT);
+
+		Handles.EndGUI();
+	}
 
 	#endregion
 
@@ -310,7 +470,7 @@ public class IconSetWindow : EditorWindow
 	{
 		get
 		{
-			return (ToolbarHeight - 1f);
+			return ToolbarHeight + rulerSize;
 		}
 	}
 
@@ -324,8 +484,8 @@ public class IconSetWindow : EditorWindow
 
 	void TrimGrid()
 	{
-		gridRect.Set(gridTrimLeft, gridTrimTop, position.width - gridTrimLeft, position.height - gridTrimTop);
-		canvas.SetContainerRect(gridRect);
+		canvasRect.Set(gridTrimLeft, gridTrimTop, position.width - gridTrimLeft, position.height - gridTrimTop);
+		canvas.SetContainerRect(canvasRect);
 	}
 
 	void DrawGrid()
@@ -334,122 +494,6 @@ public class IconSetWindow : EditorWindow
 
 		canvas.Draw();
 	}
-
-	void ResetGrid()
-	{
-		canvas.Reset();
-	}
-
-	#endregion
-
-	#region Vertex Stuff
-
-	void CreateVertex(Vector2 pos)
-	{
-		IconVertex vertex = CreateInstance<IconVertex>().Initialize(pos);
-		Vertices.Add(vertex);
-	}
-
-	void DrawVertices()
-	{
-		if (Vertices.Count > 2)
-			FuckItUp();
-
-		Vertices.ForEach(v => { v.Draw(); });
-	}
-
-	void ProcessVertexEvents(Event e)
-	{
-		IconVertex.hitRect = false;
-
-		IconVertex dragged = null;
-
-		for (int i = Vertices.Count - 1; i >= 0; i--)
-		{
-			GUI.changed = GUI.changed || Vertices[i].ProcessEvents(e);
-			if (Vertices[i].hovered)
-				dragged = Vertices[i];
-		}
-
-		if (dragged != null)
-		{
-			Vertices.Remove(dragged);
-			Vertices.Add(dragged);
-		}
-	}
-
-	public void UpdateVertices()
-	{
-		Vertices.ForEach(x => x.UpdateRect());
-		Repaint();
-	}
-
-	#region Delete
-
-	List<IconVertex> toDestroy = new List<IconVertex>();
-
-	public void DeleteVertex(IconVertex vertex)
-	{
-		toDestroy.Add(vertex);
-	}
-
-	public void DeleteAllVertices()
-	{
-		toDestroy.AddRange(Vertices);
-	}
-
-	/// <summary>
-	/// Actually do the deleting.
-	/// Called after events have been processed in OnGUI.
-	/// </summary>
-	void PurgeDestroyList()
-	{
-		if (toDestroy.Count == 0)
-			return;
-
-		for (int i = toDestroy.Count - 1; i >= 0; i--)
-		{
-			if (Vertices.Contains(toDestroy[i]))
-				Vertices.Remove(toDestroy[i]);
-
-			DestroyImmediate(toDestroy[i]);
-		}
-
-		toDestroy.Clear();
-		GUI.changed = true;
-	}
-
-	#endregion
-
-	#region Fuck it up
-
-	void FuckItUp()
-	{
-		List<Vector2> r = new List<Vector2>();
-
-		Vertices.ForEach(v => r.Add(v.OffsetPos));
-		r.Sort(new ClockwiseComparer(center(r)));
-
-		Handles.BeginGUI();
-		Handles.color = new Color(1f, 1f, 1f, 0.5f);
-
-		List<Vector3> r3 = new List<Vector3>();
-
-		r.ForEach(v => r3.Add(v));
-
-		Handles.DrawAAConvexPolygon(r3.ToArray());
-
-		Handles.EndGUI();
-	}
-
-	Vector2 center(List<Vector2> r)
-	{
-		Vector2 c = Vector2.zero;
-		r.ForEach(v => c += v);
-		return c / r.Count;
-	}
-
-	#endregion
 
 	#endregion
 
@@ -535,7 +579,8 @@ public class SettingsPopup : PopupWindowContent
 	void DrawHeader()
 	{
 		EditorGUILayout.BeginVertical(bg);
-		IconSetWindow.Instance.canvas.Size.target = DrawSlider("Size", IconSetWindow.Instance.canvas.Size.target, 0.5f, 2f);
+
+		IconSetWindow.Instance.Prefs.DrawRulers.value = DrawToggle("Draw guide rulers", IconSetWindow.Instance.Prefs.DrawRulers.value);
 
 		ShowExtraFields.target = EditorGUILayout.Foldout(ShowExtraFields.target, new GUIContent("Colors"), true);
 		if (EditorGUILayout.BeginFadeGroup(ShowExtraFields.faded))
@@ -579,6 +624,14 @@ public class SettingsPopup : PopupWindowContent
 		IconSetWindow.Instance.Prefs.GridBackground = null;
 		IconSetWindow.Instance.Repaint();
 		editorWindow.Repaint();
+	}
+
+	bool DrawToggle(string name, bool val)
+	{
+		EditorGUILayout.BeginHorizontal(header);
+		val = EditorGUILayout.ToggleLeft(name, val);
+		EditorGUILayout.EndHorizontal();
+		return val;
 	}
 
 	float DrawSlider(string name, float val, float min, float max)
@@ -802,9 +855,7 @@ public abstract class IconGridElement : ScriptableObject, IIconGridElement
 	}
 
 	public Vector2 localPosition;
-
-	public bool hovered { get { return rect.Contains(Event.current.mousePosition); } }
-
+	public bool hovered;
 	public bool dirty { get; set; }
 
 	public IconGridElement()
@@ -876,13 +927,14 @@ public class IconCanvas : ScriptableObject
 	public Vector2 localPosition;
 	public Vector2 pivot = Vector2.zero;
 	public Vector2 offset;
-	Rect gridRect;
+	public Rect gridRect;
 
 	public int cells = 24;
 	public int outerCells = 6;
 
+	const float gridBorderWidth = 5f;
 	const float gridWidth = 600f;
-	const float checkVal = 280f;
+	const float checkVal = 275f;
 
 	Vector2 center { get { return container.center + offset; } }
 
@@ -938,6 +990,10 @@ public class IconCanvas : ScriptableObject
 	{
 		SetOffset(Vector2.zero);
 		Size.target = Size.value = 1f;
+	}
+
+	public void ClearPoints()
+	{
 		if (points != null)
 			points.Clear();
 	}
@@ -1401,7 +1457,6 @@ public class IconPoint : IconGridElement
 	}
 
 	bool dragging;
-	bool hovered;
 	public bool drawRefLines { get { return dragging && Event.current.control; } }
 
 	public void MouseMove(Event e)

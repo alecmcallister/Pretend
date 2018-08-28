@@ -14,17 +14,15 @@ public class IconSetPrefs : ScriptableObject
 	#region Fields
 
 	[SerializeField]
-	AnimFloat _size;
-	public AnimFloat Size
+	AnimBool _drawRulers;
+	public AnimBool DrawRulers
 	{
 		get
 		{
-			if (_size == null)
-				_size = new AnimFloat(20f);
-			if (_size.valueChanged == null)
-				_size = new AnimFloat(_size.target < 0.01f ? 20f : _size.target);
+			if (_drawRulers == null)
+				_drawRulers = new AnimBool(true);
 
-			return _size;
+			return _drawRulers;
 		}
 	}
 
@@ -166,6 +164,7 @@ public class IconSetPrefs : ScriptableObject
 		GridMajorLineColor = null;
 		GridBGTint = null;
 		GridGradientTint = null;
+		DrawRulers.value = true;
 	}
 
 	#endregion
