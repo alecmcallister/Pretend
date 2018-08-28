@@ -338,7 +338,6 @@ public class IconSetWindow : EditorWindow
 		Rect cornerPiece = new Rect(0f, ToolbarHeight, rulerSize, rulerSize);
 		GUI.Box(leftRuler, "", RulerStyle);
 		GUI.Box(topRuler, "", RulerStyle);
-		GUI.Box(cornerPiece, "", RulerStyle);
 
 		Color majorLineColor = Color.white;
 		Color minorLineColor = Color.white.WithAlpha(0.5f);
@@ -459,7 +458,68 @@ public class IconSetWindow : EditorWindow
 		Handles.DrawAAPolyLine(pointsL);
 		Handles.DrawAAPolyLine(pointsT);
 
+		//Vector2[] guides = new Vector2[] {
+		//	new Vector2(rulerSize, canvas.gridRect.yMin), new Vector2(position.width, canvas.gridRect.yMin),
+		//	new Vector2(rulerSize, canvas.gridRect.yMax), new Vector2(position.width, canvas.gridRect.yMax),
+		//	new Vector2(canvas.gridRect.xMin, ToolbarHeight + rulerSize), new Vector2(canvas.gridRect.xMin, position.height),
+		//	new Vector2(canvas.gridRect.xMax, ToolbarHeight + rulerSize), new Vector2(canvas.gridRect.xMax, position.height)
+		//};
+		//Color guideColor = Color.cyan.WithAlpha(0.5f);
+
+		//for (int i = 0, j = 1; i < guides.Length; i += 2, j += 2)
+		//{
+		//	p1 = guides[i];
+		//	p2 = guides[j];
+
+		//	if (p1.y < gridTrimTop || p2.y < gridTrimTop || p1.x < gridTrimLeft || p2.x < gridTrimLeft ||
+		//		p1.y > position.height || p2.y > position.height || p1.x > position.width || p2.x > position.width)
+		//		continue;
+
+		//	DrawDottedLine(p1, p2, 2f, 5f, 2f, guideColor);
+		//}
+
+		GUI.Box(cornerPiece, "", RulerStyle);
+
 		Handles.EndGUI();
+	}
+
+	public static void DrawDottedLine(Vector2 from, Vector2 to, float width, float dash, float space, Color color)
+	{
+		using (new Handles.DrawingScope(color))
+		{
+			Vector3 delta = to - from;
+			Vector3 direction = delta.normalized;
+			float distance = delta.magnitude;
+			float interval = dash + space;
+
+			int count = (int)(distance / interval);
+
+			Vector3 inc = direction * interval;
+			Vector3 inc2 = direction * dash;
+
+			Vector3[] p = new Vector3[] { from, (Vector3)from + inc2 };
+
+			for (int i = 0; i < count; i++)
+			{
+				Handles.DrawAAPolyLine(width, p);
+
+				p[0] += inc;
+				p[1] = p[0] + inc2;
+			}
+
+			if (((Vector3)to - p[0]).magnitude < dash)
+				p[1] = to;
+
+			Handles.DrawAAPolyLine(width, p);
+		}
+	}
+
+	public static void DrawDottedBorder(Rect rect, float width, float dash, float space, Color color)
+	{
+		DrawDottedLine(new Vector2(rect.xMin, rect.yMin), new Vector2(rect.xMax, rect.yMin), width, dash, space, color);
+		DrawDottedLine(new Vector2(rect.xMin, rect.yMax), new Vector2(rect.xMax, rect.yMax), width, dash, space, color);
+		DrawDottedLine(new Vector2(rect.xMin, rect.yMin), new Vector2(rect.xMin, rect.yMax), width, dash, space, color);
+		DrawDottedLine(new Vector2(rect.xMax, rect.yMin), new Vector2(rect.xMax, rect.yMax), width, dash, space, color);
 	}
 
 	#endregion
@@ -1057,12 +1117,14 @@ public class IconCanvas : ScriptableObject
 
 		EditorGUI.DrawRect(container, (Color)IconSetWindow.Instance.Prefs.GridBGTint);
 		GUI.DrawTexture(container, gradientTex, ScaleMode.StretchToFill, true, 0, (Color)IconSetWindow.Instance.Prefs.GridGradientTint, 0, 0);
-		DrawRectWithBorder(gridRect, defaultBGColor, 1f, border);
-
+		//DrawRectWithBorder(gridRect, defaultBGColor, 1f, border);
+		EditorGUI.DrawRect(gridRect, defaultBGColor);
 		GUI.DrawTextureWithTexCoords(gridRect, gridTex, new Rect(Vector2.zero, cells * gridRect.size / sizeVal));
 
-		DrawGridRect(gridRect, cells, (Color)IconSetWindow.Instance.Prefs.GridMinorLineColor, 2f);
-		DrawGridRect(gridRect, outerCells, (Color)IconSetWindow.Instance.Prefs.GridMajorLineColor, 3f);
+		DrawGridRect(gridRect, cells, (Color)IconSetWindow.Instance.Prefs.GridMinorLineColor, 1f);
+		DrawGridRect(gridRect, outerCells, (Color)IconSetWindow.Instance.Prefs.GridMajorLineColor, 2f);
+
+		IconSetWindow.DrawDottedBorder(gridRect, 2f, 5f, 3f, Color.yellow.WithAlpha(0.3f));
 	}
 
 	void CalculateGridRect()
