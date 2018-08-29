@@ -24,6 +24,8 @@ public class IconSetWindow : EditorWindow
 	Rect canvasRect;
 	public IconCanvas canvas;
 
+	public List<IconCanvasGuide> guides = new List<IconCanvasGuide>();
+
 	#endregion
 
 	#region Fields
@@ -129,126 +131,7 @@ public class IconSetWindow : EditorWindow
 
 	#endregion
 
-	#endregion
-
-	#region Show
-
-	[MenuItem("Window/Pretend")]
-	public static void ShowWindow()
-	{
-		Instance.titleContent = new GUIContent("Pretend", Resources.Load<Texture>("Textures/TitleIcon"), "Make the thing!");
-	}
-
-	#endregion
-
-	#region Enable/ Disable
-
-	void OnEnable()
-	{
-		wantsMouseMove = true;
-		wantsMouseEnterLeaveWindow = true;
-
-		Prefs.DrawRulers.valueChanged.AddListener(Repaint);
-
-		if (!canvas)
-		{
-			canvas = CreateInstance(typeof(IconCanvas)) as IconCanvas;
-			canvas.Size.valueChanged.AddListener(Repaint);
-		}
-	}
-
-	void OnDisable()
-	{
-		DestroyImmediate(canvas);
-		canvas = null;
-	}
-
-	void OnDestroy()
-	{
-		//Prefs.Save();
-	}
-
-	#endregion
-
-	#region OnGUI
-
-	void OnGUI()
-	{
-		DrawGrid();
-
-		if (Prefs.DrawRulers.value)
-			DrawGuideRulers();
-
-		DrawToolbar();
-
-		for (int i = canvas.points.Count - 1; i >= 0; i--)
-			GUI.changed |= canvas.points[i].ProcessEvents(Event.current);
-
-		canvas.ProcessEvents(Event.current);
-
-		ProcessEvents(Event.current);
-
-		if (GUI.changed)
-			Repaint();
-	}
-
-	#endregion
-
-	void ProcessEvents(Event e)
-	{
-		if (e.type == EventType.MouseMove || e.type == EventType.MouseEnterWindow || e.type == EventType.MouseLeaveWindow)
-			GUI.changed = true;
-
-		if (e.commandName != "")
-			Debug.Log("Command recognized: " + e.commandName);
-
-	}
-
-
-
-	#region Toolbar
-
-	void DrawToolbar()
-	{
-		GUILayout.BeginHorizontal(EditorStyles.toolbar);
-
-		if (GUILayout.Button(ClearVerticesContent, EditorStyles.toolbarButton))
-			canvas.ClearPoints();
-
-		if (GUILayout.Button(ResetGridContent, EditorStyles.toolbarButton))
-			canvas.Reset();
-
-		GUILayout.Space(5f);
-
-		Vector2 localMouse = canvas.GetLocalMousePositionOnGrid() * 24f;
-		string mousePosText = canvasRect.Contains(Event.current.mousePosition) ? " (" + localMouse.x.ToString("0.0") + ", " + localMouse.y.ToString("0.0") + ") " : "";
-
-		GUILayout.Label(mousePosText, EditorStyles.toolbarTextField);
-		GUILayout.FlexibleSpace();
-
-		if (EditorGUILayout.DropdownButton(SettingsContent, FocusType.Passive, EditorStyles.toolbarDropDown))
-			PopupWindow.Show(settingsDropdownRect, new SettingsPopup());
-
-		if (Event.current.type == EventType.Repaint)
-		{
-			Rect last = GUILayoutUtility.GetLastRect();
-			settingsDropdownRect = new Rect(last.position.x - 300f + last.width, last.position.y, last.width, last.height);
-		}
-
-		GUILayout.EndHorizontal();
-	}
-
-	#endregion
-
-	#region Guide rulers
-
-	float rulerSize
-	{
-		get
-		{
-			return Prefs.DrawRulers.value ? 16f : 0f;
-		}
-	}
+	#region Styles
 
 	GUIStyle _rulerStyle;
 	public GUIStyle RulerStyle
@@ -324,6 +207,206 @@ public class IconSetWindow : EditorWindow
 		}
 	}
 
+	#endregion
+
+	#endregion
+
+	#region Show
+
+	[MenuItem("Window/Pretend")]
+	public static void ShowWindow()
+	{
+		Instance.titleContent = new GUIContent("Pretend", Resources.Load<Texture>("Textures/TitleIcon"), "Make the thing!");
+	}
+
+	#endregion
+
+	#region Enable/ Disable
+
+	void OnEnable()
+	{
+		wantsMouseMove = true;
+		wantsMouseEnterLeaveWindow = true;
+
+		Prefs.DrawRulers.valueChanged.AddListener(Repaint);
+
+		if (!canvas)
+		{
+			canvas = CreateInstance(typeof(IconCanvas)) as IconCanvas;
+			canvas.Size.valueChanged.AddListener(Repaint);
+		}
+		canvas.Reset();
+		IconCanvasGuide.ClearAllGuides();
+	}
+
+	void OnDisable()
+	{
+		DestroyImmediate(canvas);
+		canvas = null;
+	}
+
+	void OnDestroy()
+	{
+		//Prefs.Save();
+	}
+
+	#endregion
+
+	#region OnGUI
+
+	void OnGUI()
+	{
+		ProcessEvents(Event.current);
+
+		DrawGrid();
+		DrawGuides();
+		DrawPoints();
+
+		if (Prefs.DrawRulers.value)
+			DrawGuideRulers();
+
+		DrawToolbar();
+
+		if (GUI.changed)
+			Repaint();
+	}
+
+	#endregion
+
+	void ProcessEvents(Event e)
+	{
+		for (int i = canvas.points.Count - 1; i >= 0; i--)
+			GUI.changed |= canvas.points[i].ProcessEvents(Event.current);
+
+		ProcessGuideEvents(e);
+
+		canvas.ProcessEvents(Event.current);
+
+		if (e.type == EventType.MouseMove || e.type == EventType.MouseEnterWindow || e.type == EventType.MouseLeaveWindow)
+			GUI.changed = true;
+	}
+
+	#region Toolbar
+
+	void DrawToolbar()
+	{
+		GUILayout.BeginHorizontal(EditorStyles.toolbar);
+
+		if (GUILayout.Button(ClearVerticesContent, EditorStyles.toolbarButton))
+			canvas.ClearPoints();
+
+		if (GUILayout.Button(ResetGridContent, EditorStyles.toolbarButton))
+		{
+			canvas.Reset();
+			IconCanvasGuide.ClearAllGuides();
+		}
+
+		GUILayout.Space(5f);
+
+		Vector2 localMouse = canvas.GetLocalMousePositionOnGrid() * 24f;
+		string mousePosText = canvasRect.Contains(Event.current.mousePosition) ? " (" + localMouse.x.ToString("0.0") + ", " + localMouse.y.ToString("0.0") + ") " : "";
+
+		GUILayout.Label(mousePosText, EditorStyles.toolbarTextField);
+		GUILayout.FlexibleSpace();
+
+		if (EditorGUILayout.DropdownButton(SettingsContent, FocusType.Passive, EditorStyles.toolbarDropDown))
+			PopupWindow.Show(settingsDropdownRect, new SettingsPopup());
+
+		if (Event.current.type == EventType.Repaint)
+		{
+			Rect last = GUILayoutUtility.GetLastRect();
+			settingsDropdownRect = new Rect(last.position.x - 300f + last.width, last.position.y, last.width, last.height);
+		}
+
+		GUILayout.EndHorizontal();
+	}
+
+	#endregion
+
+	#region Guide rulers
+
+	IconCanvasGuide activeGuide = null;
+
+	public void ProcessGuideEvents(Event e)
+	{
+		Vector2 localMouse = canvas.GetLocalMousePositionOnGrid();
+
+		if (e.type == EventType.MouseDown && e.button == 0)
+		{
+			if (topRuler.Contains(e.mousePosition))
+			{
+				activeGuide = new IconCanvasGuide(canvas, localMouse, IconCanvasGuideType.Horizontal);
+			}
+			else if (leftRuler.Contains(e.mousePosition))
+			{
+				activeGuide = new IconCanvasGuide(canvas, localMouse, IconCanvasGuideType.Vertical);
+			}
+			else
+			{
+				activeGuide = IconCanvasGuide.GetGuideAtPos(e.mousePosition);
+
+				// May not need this
+				if (activeGuide != null)
+				{
+					activeGuide.snap = e.control;
+					activeGuide.SetLocalPosition(localMouse);
+				}
+			}
+
+			if (activeGuide != null)
+			{
+				e.Use();
+				GUI.changed = true;
+			}
+		}
+
+		if ((e.type == EventType.MouseMove || e.type == EventType.MouseDrag) && activeGuide != null)
+		{
+			activeGuide.snap = e.control;
+			activeGuide.SetLocalPosition(localMouse);
+			e.Use();
+			GUI.changed = true;
+		}
+
+		if (e.type == EventType.MouseUp && e.button == 0 && activeGuide != null)
+		{
+			if (activeGuide.Value < 0f || activeGuide.Value > 1f)
+				activeGuide.DeleteGuide();
+
+			activeGuide = null;
+
+			e.Use();
+			GUI.changed = true;
+		}
+
+		if (activeGuide != null && e.isKey)
+		{
+			activeGuide.snap = e.control;
+			activeGuide.SetLocalPosition(localMouse);
+			GUI.changed = true;
+		}
+	}
+
+	public void DrawGuides()
+	{
+		foreach (IconCanvasGuide guide in IconCanvasGuide.Guides)
+		{
+			DrawDottedLine(guide);
+		}
+	}
+
+	float rulerSize
+	{
+		get
+		{
+			return Prefs.DrawRulers.value ? 16f : 0f;
+		}
+	}
+
+	Rect leftRuler;
+	Rect topRuler;
+	Rect cornerPiece;
+
 	/// <summary>
 	/// Move to separate class
 	/// </summary>
@@ -333,9 +416,9 @@ public class IconSetWindow : EditorWindow
 
 		Rect textRect = new Rect();
 
-		Rect leftRuler = new Rect(0f, ToolbarHeight + rulerSize, rulerSize, position.height - ToolbarHeight - rulerSize);
-		Rect topRuler = new Rect(rulerSize, ToolbarHeight, position.width - rulerSize, rulerSize);
-		Rect cornerPiece = new Rect(0f, ToolbarHeight, rulerSize, rulerSize);
+		leftRuler = new Rect(0f, ToolbarHeight + rulerSize, rulerSize, position.height - ToolbarHeight - rulerSize);
+		topRuler = new Rect(rulerSize, ToolbarHeight, position.width - rulerSize, rulerSize);
+		cornerPiece = new Rect(0f, ToolbarHeight, rulerSize, rulerSize);
 		GUI.Box(leftRuler, "", RulerStyle);
 		GUI.Box(topRuler, "", RulerStyle);
 
@@ -483,6 +566,11 @@ public class IconSetWindow : EditorWindow
 		Handles.EndGUI();
 	}
 
+	public void DrawDottedLine(IconCanvasGuide guide)
+	{
+		DrawDottedLine(guide[0], guide[1], guide.width, guide.dash, guide.space, (guide.hovered || guide == activeGuide) ? guide.hover : guide.color);
+	}
+
 	public static void DrawDottedLine(Vector2 from, Vector2 to, float width, float dash, float space, Color color)
 	{
 		using (new Handles.DrawingScope(color))
@@ -552,7 +640,12 @@ public class IconSetWindow : EditorWindow
 	{
 		TrimGrid();
 
-		canvas.Draw();
+		canvas.DrawGrid();
+	}
+
+	void DrawPoints()
+	{
+		canvas.DrawPoints();
 	}
 
 	#endregion
@@ -894,8 +987,6 @@ public abstract class IconGridElement : ScriptableObject, IIconGridElement
 			if (_style == null)
 			{
 				_style = new GUIStyle();
-				//_style.normal.background = (Texture2D)EditorGUIUtility.IconContent("slider thumb@2x").image;
-				//_style.hover.background = (Texture2D)EditorGUIUtility.IconContent("slider thumb act@2x").image;
 				_style.normal.background = Resources.Load<Texture2D>("Editor/Textures/point_normal");
 				_style.hover.background = Resources.Load<Texture2D>("Editor/Textures/point_active");
 			}
@@ -925,7 +1016,6 @@ public abstract class IconGridElement : ScriptableObject, IIconGridElement
 
 	public virtual void Draw()
 	{
-		//EditorGUI.DrawRect(drawnRect, Color.blue);
 		GUI.Box(drawnRect, "", Style);
 		EditorGUIUtility.AddCursorRect(drawnRect, MouseCursor.MoveArrow);
 	}
@@ -1058,12 +1148,6 @@ public class IconCanvas : ScriptableObject
 			points.Clear();
 	}
 
-	public void Draw()
-	{
-		DrawGrid();
-		DrawPoints(gridRect);
-	}
-
 	void CheckOffset()
 	{
 		float halfW = (container.width / 2f) + (checkVal * Size.value);
@@ -1106,7 +1190,7 @@ public class IconCanvas : ScriptableObject
 		gridTex.Apply();
 	}
 
-	void DrawGrid()
+	public void DrawGrid()
 	{
 		UpdateGridColors();
 
@@ -1117,7 +1201,6 @@ public class IconCanvas : ScriptableObject
 
 		EditorGUI.DrawRect(container, (Color)IconSetWindow.Instance.Prefs.GridBGTint);
 		GUI.DrawTexture(container, gradientTex, ScaleMode.StretchToFill, true, 0, (Color)IconSetWindow.Instance.Prefs.GridGradientTint, 0, 0);
-		//DrawRectWithBorder(gridRect, defaultBGColor, 1f, border);
 		EditorGUI.DrawRect(gridRect, defaultBGColor);
 		GUI.DrawTextureWithTexCoords(gridRect, gridTex, new Rect(Vector2.zero, cells * gridRect.size / sizeVal));
 
@@ -1207,13 +1290,11 @@ public class IconCanvas : ScriptableObject
 		offset += delta;
 		if (Glyph != null)
 			Glyph.Move(delta);
-		//glyphs.ForEach(g => g.Move(delta));
 	}
 
 	public void MoveLocal(Vector2 delta)
 	{
 		localPosition += delta;
-		//glyphs.ForEach(g => g.MoveLocal(delta));
 	}
 
 	public void SetPosition(Vector2 pos)
@@ -1221,13 +1302,11 @@ public class IconCanvas : ScriptableObject
 		position = pos;
 		if (Glyph != null)
 			Glyph.SetPosition(pos);
-		// do something to the glyphs
 	}
 
 	public void SetLocalPosition(Vector2 pos)
 	{
 		localPosition = pos;
-		// do something to the glyphs
 	}
 
 	public void SetOffset(Vector2 offset)
@@ -1317,8 +1396,6 @@ public class IconCanvas : ScriptableObject
 		generic.ShowAsContext();
 	}
 
-	float zoomSensitivity = 1f;
-
 	void OnScroll(Event e)
 	{
 		if (!e.isScrollWheel)
@@ -1327,7 +1404,7 @@ public class IconCanvas : ScriptableObject
 		pivot = e.mousePosition;
 
 		float prev = Size.value;
-		Size.target = Size.value = Mathf.Abs(Size.value) * (-e.delta.y * zoomSensitivity * .015f + 1.0f);
+		Size.target = Size.value = Mathf.Abs(Size.value) * (-e.delta.y * .015f + 1.0f);
 		float perc = 1f - (Size.value / prev);
 
 		Vector2 toCenter = pivot - center;
@@ -1372,16 +1449,22 @@ public class IconCanvas : ScriptableObject
 	Vector2 origin = Vector2.zero;
 	public List<IconPoint> points = new List<IconPoint>();
 
-	public void DrawPoints(Rect canvas)
+	public void DrawPoints()
 	{
 		foreach (IconPoint p in points)
 		{
-			DrawReferenceLines(p);
+			if (p.drawRefLines)
+			{
+				//IconSetWindow.Instance.AddGuides(GetReferenceLines(p));
+				// Move outside this method so that we can draw at a different time
+				DrawReferenceLines(p);
+			}
+
 		}
 		foreach (IconPoint point in points)
 		{
-			Vector2 pos = canvas.position + new Vector2(canvas.width * point.localPosition.x, canvas.height * point.localPosition.y);
-			float pointSize = canvas.width / 50f;
+			Vector2 pos = gridRect.position + new Vector2(gridRect.width * point.localPosition.x, gridRect.height * point.localPosition.y);
+			float pointSize = gridRect.width / 50f;
 			point.rect.Set(pos.x, pos.y, pointSize, pointSize);
 			point.Draw();
 		}
@@ -1394,7 +1477,7 @@ public class IconCanvas : ScriptableObject
 		points.Add(point);
 	}
 
-	public Vector2 GetLocalPositionOnCanvas(Rect canvas, Vector2 pos)
+	public static Vector2 GetLocalPositionOnCanvas(Rect canvas, Vector2 pos)
 	{
 		pos -= canvas.position;
 		return new Vector2(pos.x / canvas.width, pos.y / canvas.height);
@@ -1430,9 +1513,19 @@ public class IconCanvas : ScriptableObject
 		Handles.DrawLine(left, right);
 		Handles.DrawLine(top, bottom);
 
-
 		Handles.color = Color.white;
 		Handles.EndGUI();
+	}
+
+	public List<Vector2[]> GetReferenceLines(IconPoint p)
+	{
+		Vector2 center = p.rect.position;
+		Vector2 top = new Vector2(center.x, container.yMin);
+		Vector2 bottom = new Vector2(center.x, container.yMax);
+		Vector2 left = new Vector2(container.xMin, center.y);
+		Vector2 right = new Vector2(container.xMax, center.y);
+
+		return new List<Vector2[]>() { new Vector2[] { left, right }, new Vector2[] { top, bottom } };
 	}
 }
 
@@ -1518,7 +1611,7 @@ public class IconPoint : IconGridElement
 		return temp;
 	}
 
-	bool dragging;
+	public bool dragging;
 	public bool drawRefLines { get { return dragging && Event.current.control; } }
 
 	public void MouseMove(Event e)
@@ -1545,6 +1638,8 @@ public class IconPoint : IconGridElement
 				e.Use();
 				dragging = true;
 				dirty = true;
+
+				MouseDrag(e);
 			}
 		}
 	}
@@ -1556,6 +1651,7 @@ public class IconPoint : IconGridElement
 			e.Use();
 			dragging = false;
 			dirty = true;
+			IconCanvasGuide.Guides.ForEach(g => g.hovered = false);
 		}
 	}
 
@@ -1564,6 +1660,7 @@ public class IconPoint : IconGridElement
 		if (e.button == 0 && dragging)
 		{
 			localPosition = IconSetWindow.Instance.canvas.GetLocalMousePositionOnGrid();
+			localPosition = IconCanvasGuide.GetSnappedLocation(this);
 
 			if (e.control)
 			{
