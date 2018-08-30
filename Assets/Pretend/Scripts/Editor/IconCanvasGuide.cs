@@ -105,6 +105,11 @@ public class IconCanvasGuide
 		Guides.Clear();
 	}
 
+	public static IconCanvasGuide AddGuide(float val, IconCanvasGuideType type)
+	{
+		return new IconCanvasGuide(IconSetWindow.Instance.canvas, val, type);
+	}
+
 	/// <summary>
 	/// Forms a box around the guide line. Used for snapping (i.e. if something is within this rect, snap it to the guide)
 	/// </summary>

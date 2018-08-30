@@ -267,6 +267,12 @@ public class IconSetWindow : EditorWindow
 
 		DrawToolbar();
 
+		if (popupDelegate != null && Event.current.type == EventType.Repaint)
+		{
+			popupDelegate.Invoke();
+			popupDelegate = null;
+		}
+
 		if (GUI.changed)
 			Repaint();
 	}
@@ -284,6 +290,54 @@ public class IconSetWindow : EditorWindow
 
 		if (e.type == EventType.MouseMove || e.type == EventType.MouseEnterWindow || e.type == EventType.MouseLeaveWindow)
 			GUI.changed = true;
+
+		if (e.type == EventType.KeyDown)
+		{
+			if (e.keyCode == KeyCode.Space && canvas.container.Contains(e.mousePosition))
+			{
+				IconFunctionPopup functionPopup = new IconFunctionPopup();
+				functionPopup.FunctionCallback += ReceiveFunctionCallback;
+				PopupWindow.Show(new Rect(e.mousePosition, Vector2.zero), functionPopup);
+			}
+		}
+	}
+
+
+	public delegate void PopupDelegate();
+	public PopupDelegate popupDelegate;
+
+	void ReceiveFunctionCallback(string function)
+	{
+		if (function == "Add guide...")
+		{
+			popupDelegate = OpenGuidePopup;
+		}
+		if (function == "Clear points")
+		{
+			canvas.ClearPoints();
+		}
+		if (function == "Reset grid")
+		{
+			canvas.Reset();
+		}
+		if (function == "Toggle guide rulers")
+		{
+			Prefs.DrawRulers.value = !Prefs.DrawRulers.value;
+		}
+		if (function == "Clear guides")
+		{
+			IconCanvasGuide.ClearAllGuides();
+		}
+
+
+
+	}
+
+	public void OpenGuidePopup()
+	{
+		IconCanvasGuidePopup guidePopup = new IconCanvasGuidePopup();
+		guidePopup.Callback += (float val, IconCanvasGuideType type) => { IconCanvasGuide.AddGuide(val, type); };
+		PopupWindow.Show(new Rect(rulerSize + 5f, ToolbarHeight + rulerSize + 5f, 0, 0), guidePopup);
 	}
 
 	#region Toolbar
