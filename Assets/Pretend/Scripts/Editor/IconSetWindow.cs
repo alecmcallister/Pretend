@@ -302,7 +302,6 @@ public class IconSetWindow : EditorWindow
 		}
 	}
 
-
 	public delegate void PopupDelegate();
 	public PopupDelegate popupDelegate;
 
@@ -328,9 +327,6 @@ public class IconSetWindow : EditorWindow
 		{
 			IconCanvasGuide.ClearAllGuides();
 		}
-
-
-
 	}
 
 	public void OpenGuidePopup()
@@ -445,7 +441,7 @@ public class IconSetWindow : EditorWindow
 	{
 		foreach (IconCanvasGuide guide in IconCanvasGuide.Guides)
 		{
-			DrawDottedLine(guide);
+			DrawDottedLine(guide, canvas.gridRect.position - new Vector2(rulerSize, ToolbarHeight + rulerSize));
 		}
 	}
 
@@ -605,6 +601,11 @@ public class IconSetWindow : EditorWindow
 		DrawDottedLine(guide[0], guide[1], guide.width, guide.dash, guide.space, (guide.hovered || guide == activeGuide) ? guide.hover : guide.color);
 	}
 
+	public void DrawDottedLine(IconCanvasGuide guide, Vector2 offset)
+	{
+		DrawDottedLine(guide[0], guide[1], guide.width, guide.dash, guide.space, (guide.hovered || guide == activeGuide) ? guide.hover : guide.color, guide.type, offset);
+	}
+
 	public static void DrawDottedLine(Vector2 from, Vector2 to, float width, float dash, float space, Color color)
 	{
 		using (new Handles.DrawingScope(color))
@@ -620,6 +621,55 @@ public class IconSetWindow : EditorWindow
 			Vector3 inc2 = direction * dash;
 
 			Vector3[] p = new Vector3[] { from, (Vector3)from + inc2 };
+
+			for (int i = 0; i < count; i++)
+			{
+				Handles.DrawAAPolyLine(width, p);
+
+				p[0] += inc;
+				p[1] = p[0] + inc2;
+			}
+
+			if (((Vector3)to - p[0]).magnitude < dash)
+				p[1] = to;
+
+			Handles.DrawAAPolyLine(width, p);
+		}
+	}
+
+	public static void DrawDottedLine(Vector2 from, Vector2 to, float width, float dash, float space, Color color, IconCanvasGuideType type, Vector2 offset)
+	{
+		using (new Handles.DrawingScope(color))
+		{
+			Vector2 direction = (to - from).normalized;
+			float interval = dash + space;
+
+			Vector2 del;
+			if (type == IconCanvasGuideType.Horizontal)
+				del = direction * (offset.x % interval);
+			else
+				del = direction * (offset.y % interval);
+
+			Vector2 inv = (direction * interval) + del;
+
+			Vector2 st;
+			if (type == IconCanvasGuideType.Horizontal)
+				st = from + (del.x > 0f ? del : inv);
+			else
+				st = from + (del.y > 0f ? del : inv);
+
+			float distance = (to - from).magnitude;
+
+			int count = (int)(distance / interval);
+
+			Vector3 inc = direction * interval;
+			Vector3 inc2 = direction * dash;
+			Vector2 ds = from - st;
+
+			if (ds.magnitude > space)
+				Handles.DrawAAPolyLine(width, new Vector3[] { from, st - (direction * space) });
+
+			Vector3[] p = new Vector3[] { st, (Vector3)st + inc2 };
 
 			for (int i = 0; i < count; i++)
 			{

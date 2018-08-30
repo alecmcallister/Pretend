@@ -39,7 +39,10 @@ public class IconFunctionPopup : PopupWindowContent
 	Vector2 scrollPos = Vector2.zero;
 	//float scrollItemHeight = 25f;
 	float scrollItemHeight = 20f;
-	float scrollHeight = 140f;
+	float scrollHeight
+	{
+		get { return Mathf.Min(scrollItemHeight * filteredFunctions.Count, 140f); }
+	}
 	float searchHeight = 18f;
 
 	static Styles styles;
@@ -228,8 +231,6 @@ public class IconFunctionPopup : PopupWindowContent
 		}
 
 		EditorGUILayout.EndScrollView();
-
-
 	}
 
 	public override Vector2 GetWindowSize()
