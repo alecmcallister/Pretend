@@ -1,0 +1,76 @@
+
+
+Changes to current implementation:
+	- Draw rulers inside a GUI.BeginGroup(Rect) block to fix clipping issues
+		- Will be easier to move around should the time come.
+	
+	- Refactor the function search implementation
+		- Use Queue<delegate> maybe?
+	
+	- Create a generic popup class for controls that require user input (i.e. adding guide ruler)
+
+
+
+TODO implementation:
+
+	- Misc buttons (including functionality)
+		- Save
+			- .ttf
+			- Icon glyph progress
+			- Settings
+			- Guide set
+		- Load
+			- .ttf
+			- Folder
+			- Settings
+			- Guide set
+		- Export
+			- .ttf
+			- Glyph (single or spritesheet)
+				- .png
+				- .whatever
+			- Settings
+			- Maybe custom file type? (i.e. iconfont.bitchplease)
+
+	- Dockable floating content window base class
+		- Drag title to move around main window
+		- Snaps to left, right, top, bottom
+		- Holds various buttons/ controls
+		- Change settings to be in one of these
+
+	- Selecting
+		- Box, ellipse, free
+			- Visuals
+			- Functionality
+				- Modifier keys affect selection aspect ratio/ center
+
+	- Tool panel (floating or docked)
+		- Has canvas tools for the user to select
+			- Draw shit
+			- Select shit
+			- All the other shit
+
+	- Main page to load/ select font file
+		- Button to load a .ttf font (file/ folder)
+			- Open a file browser to a folder containing multiple .ttf files
+			- Open a file browser to a specific .ttf file
+			- If a folder has been loaded previously:
+				- List the .ttf files inside
+				- Allow for each file to be previewed
+
+		- Button to create a new iconfont
+			- Prompts for filename + path
+
+	- Font view
+		- List of all glyphs in a font
+		- Buttons to select a glyph (maybe)
+
+	- Circular/ bezier guides
+
+	- Implement undo/ redo
+		- Add visual undo window (i.e. Gimp)
+
+	- Figure the fuck out how to draw these fucking shapes on screen, idiot
+
+	- Make the thing actually create an icon
+		- THEN IMMEDIATELY SELL THIS BROKEN SHIT ON THE ASSET STORE $$$$$$

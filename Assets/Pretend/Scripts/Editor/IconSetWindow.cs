@@ -21,10 +21,13 @@ public class IconSetWindow : EditorWindow
 	#region Variables & properties
 
 	Rect settingsDropdownRect;
+	Rect toolbarRect;
+
 	Rect canvasRect;
 	public IconCanvas canvas;
 
 	public List<IconCanvasGuide> guides = new List<IconCanvasGuide>();
+	const float toolbarHeight = 17f; // actually 18, but the toolbar's y position is -1
 
 	#endregion
 
@@ -51,26 +54,6 @@ public class IconSetWindow : EditorWindow
 
 	#endregion
 
-	#region Toolbar height
-
-	float _toolbarHeight = -1;
-	public float ToolbarHeight
-	{
-		get
-		{
-			if (_toolbarHeight - 1 < 0)
-				_toolbarHeight = EditorStyles.toolbarButton.CalcSize(new GUIContent("Settings")).y;
-
-			return _toolbarHeight - 1;
-		}
-		set
-		{
-			_toolbarHeight = value;
-		}
-	}
-
-	#endregion
-
 	#region Prefs
 
 	IconSetPrefs _prefs;
@@ -88,44 +71,6 @@ public class IconSetWindow : EditorWindow
 		set
 		{
 			_prefs = value;
-		}
-	}
-
-	#endregion
-
-	#region Content
-
-	GUIContent _clearVerticesContent;
-	public GUIContent ClearVerticesContent
-	{
-		get
-		{
-			if (_clearVerticesContent == null)
-				_clearVerticesContent = new GUIContent("Clear Points");
-			return _clearVerticesContent;
-		}
-	}
-
-	GUIContent _resetGridContent;
-	public GUIContent ResetGridContent
-	{
-		get
-		{
-			if (_resetGridContent == null)
-				_resetGridContent = new GUIContent("Reset Grid");
-			return _resetGridContent;
-		}
-	}
-
-	GUIContent _settingsContent;
-	public GUIContent SettingsContent
-	{
-		get
-		{
-			if (_settingsContent == null)
-				_settingsContent = new GUIContent("Settings");
-
-			return _settingsContent;
 		}
 	}
 
@@ -267,11 +212,7 @@ public class IconSetWindow : EditorWindow
 
 		DrawToolbar();
 
-		if (popupDelegate != null && Event.current.type == EventType.Repaint)
-		{
-			popupDelegate.Invoke();
-			popupDelegate = null;
-		}
+		HandlePopupDelegate();
 
 		if (GUI.changed)
 			Repaint();
@@ -299,11 +240,22 @@ public class IconSetWindow : EditorWindow
 				functionPopup.FunctionCallback += ReceiveFunctionCallback;
 				PopupWindow.Show(new Rect(e.mousePosition, Vector2.zero), functionPopup);
 			}
+			e.Use();
 		}
 	}
 
+
 	public delegate void PopupDelegate();
 	public PopupDelegate popupDelegate;
+
+	void HandlePopupDelegate()
+	{
+		if (popupDelegate != null && Event.current.type == EventType.Repaint)
+		{
+			popupDelegate.Invoke();
+			popupDelegate = null;
+		}
+	}
 
 	void ReceiveFunctionCallback(string function)
 	{
@@ -333,33 +285,24 @@ public class IconSetWindow : EditorWindow
 	{
 		IconCanvasGuidePopup guidePopup = new IconCanvasGuidePopup();
 		guidePopup.Callback += (float val, IconCanvasGuideType type) => { IconCanvasGuide.AddGuide(val, type); };
-		PopupWindow.Show(new Rect(rulerSize + 5f, ToolbarHeight + rulerSize + 5f, 0, 0), guidePopup);
+		PopupWindow.Show(new Rect(rulerSize + 5f, toolbarHeight + rulerSize + 5f, 0, 0), guidePopup);
 	}
 
 	#region Toolbar
 
 	void DrawToolbar()
 	{
-		GUILayout.BeginHorizontal(EditorStyles.toolbar);
+		toolbarRect = EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
 
-		if (GUILayout.Button(ClearVerticesContent, EditorStyles.toolbarButton))
+		if (GUILayout.Button("Clear Points", EditorStyles.toolbarButton))
 			canvas.ClearPoints();
 
-		if (GUILayout.Button(ResetGridContent, EditorStyles.toolbarButton))
-		{
+		if (GUILayout.Button("Reset Grid", EditorStyles.toolbarButton))
 			canvas.Reset();
-			IconCanvasGuide.ClearAllGuides();
-		}
 
-		GUILayout.Space(5f);
-
-		Vector2 localMouse = canvas.GetLocalMousePositionOnGrid() * 24f;
-		string mousePosText = canvasRect.Contains(Event.current.mousePosition) ? " (" + localMouse.x.ToString("0.0") + ", " + localMouse.y.ToString("0.0") + ") " : "";
-
-		GUILayout.Label(mousePosText, EditorStyles.toolbarTextField);
 		GUILayout.FlexibleSpace();
 
-		if (EditorGUILayout.DropdownButton(SettingsContent, FocusType.Passive, EditorStyles.toolbarDropDown))
+		if (EditorGUILayout.DropdownButton(new GUIContent("Settings"), FocusType.Passive, EditorStyles.toolbarDropDown))
 			PopupWindow.Show(settingsDropdownRect, new IconSettingsPopup());
 
 		if (Event.current.type == EventType.Repaint)
@@ -368,7 +311,7 @@ public class IconSetWindow : EditorWindow
 			settingsDropdownRect = new Rect(last.position.x - 300f + last.width, last.position.y, last.width, last.height);
 		}
 
-		GUILayout.EndHorizontal();
+		EditorGUILayout.EndHorizontal();
 	}
 
 	#endregion
@@ -441,7 +384,7 @@ public class IconSetWindow : EditorWindow
 	{
 		foreach (IconCanvasGuide guide in IconCanvasGuide.Guides)
 		{
-			DrawDottedLine(guide, canvas.gridRect.position - new Vector2(rulerSize, ToolbarHeight + rulerSize));
+			DrawDottedLine(guide, canvas.gridRect.position - new Vector2(rulerSize, toolbarHeight + rulerSize));
 		}
 	}
 
@@ -466,9 +409,9 @@ public class IconSetWindow : EditorWindow
 
 		Rect textRect = new Rect();
 
-		leftRuler = new Rect(0f, ToolbarHeight + rulerSize, rulerSize, position.height - ToolbarHeight - rulerSize);
-		topRuler = new Rect(rulerSize, ToolbarHeight, position.width - rulerSize, rulerSize);
-		cornerPiece = new Rect(0f, ToolbarHeight, rulerSize, rulerSize);
+		leftRuler = new Rect(0f, toolbarHeight + rulerSize, rulerSize, position.height - toolbarHeight - rulerSize);
+		topRuler = new Rect(rulerSize, toolbarHeight, position.width - rulerSize, rulerSize);
+		cornerPiece = new Rect(0f, toolbarHeight, rulerSize, rulerSize);
 		GUI.Box(leftRuler, "", RulerStyle);
 		GUI.Box(topRuler, "", RulerStyle);
 
@@ -485,7 +428,7 @@ public class IconSetWindow : EditorWindow
 
 		float interval = canvas.gridRect.height / canvas.cells;
 
-		float yMin = ToolbarHeight + rulerSize + borderS;
+		float yMin = toolbarHeight + rulerSize + borderS;
 		float yMax = position.height - borderS;
 
 		float xMin = rulerSize + borderS;
@@ -543,7 +486,7 @@ public class IconSetWindow : EditorWindow
 		}
 
 		m = 0;
-		p1.y = ToolbarHeight + borderS;
+		p1.y = toolbarHeight + borderS;
 		p2.y = gridTrimTop - borderS;
 
 		if (x > xMin)
@@ -573,7 +516,7 @@ public class IconSetWindow : EditorWindow
 			p1.x = p2.x = x;
 			Handles.DrawLine(p1, p2);
 
-			textRect.Set(x + 2f, ToolbarHeight + borderS, interval - 2f, rulerSize - borderS - borderS);
+			textRect.Set(x + 2f, toolbarHeight + borderS, interval - 2f, rulerSize - borderS - borderS);
 			GUI.Label(textRect, (m - 1).ToString(), RulerTextStyleT);
 
 			x += interval;
@@ -702,7 +645,7 @@ public class IconSetWindow : EditorWindow
 	{
 		get
 		{
-			return ToolbarHeight + rulerSize;
+			return toolbarHeight + rulerSize;
 		}
 	}
 
