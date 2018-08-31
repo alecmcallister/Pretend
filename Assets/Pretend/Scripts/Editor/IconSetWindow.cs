@@ -1,7 +1,10 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEditor.AnimatedValues;
 using UnityEngine;
@@ -210,6 +213,8 @@ public class IconSetWindow : EditorWindow
 		if (Prefs.DrawRulers.value)
 			DrawGuideRulers();
 
+		DrawSidebar();
+
 		DrawToolbar();
 
 		HandlePopupDelegate();
@@ -222,12 +227,15 @@ public class IconSetWindow : EditorWindow
 
 	void ProcessEvents(Event e)
 	{
+		ProcessSidebarEdgeEvents(e);
+
 		for (int i = canvas.points.Count - 1; i >= 0; i--)
 			GUI.changed |= canvas.points[i].ProcessEvents(Event.current);
 
 		ProcessGuideEvents(e);
 
-		canvas.ProcessEvents(Event.current);
+		if (canvas.container.Contains(e.mousePosition))
+			canvas.ProcessEvents(e);
 
 		if (e.type == EventType.MouseMove || e.type == EventType.MouseEnterWindow || e.type == EventType.MouseLeaveWindow)
 			GUI.changed = true;
@@ -400,25 +408,161 @@ public class IconSetWindow : EditorWindow
 	Rect topRuler;
 	Rect cornerPiece;
 
-	/// <summary>
-	/// Move to separate class
-	/// </summary>
+	#region Old DrawGuideRulers()
+	//void DrawGuideRulers()
+	//{
+	//	bool sideways = false;
+
+	//	Rect textRect = new Rect();
+
+	//	leftRuler = new Rect(0f, toolbarHeight + rulerSize, rulerSize, position.height - toolbarHeight - rulerSize);
+	//	topRuler = new Rect(rulerSize, toolbarHeight, position.width - rulerSize, rulerSize);
+	//	cornerPiece = new Rect(0f, toolbarHeight, rulerSize, rulerSize);
+	//	GUI.Box(leftRuler, "", RulerStyle);
+	//	GUI.Box(topRuler, "", RulerStyle);
+
+	//	Color majorLineColor = Color.white;
+	//	Color minorLineColor = Color.white.WithAlpha(0.5f);
+
+	//	Handles.BeginGUI();
+	//	float borderL = 6f;
+	//	float borderS = 4f;
+
+	//	bool major;
+	//	int m = 0;
+	//	int majorCells = canvas.cells / canvas.outerCells;
+
+	//	float interval = canvas.gridRect.height / canvas.cells;
+
+	//	float yMin = toolbarHeight + rulerSize + borderS;
+	//	float yMax = position.height - borderS;
+
+	//	float xMin = rulerSize + borderS;
+	//	float xMax = position.width - borderS;
+
+	//	Vector2 p1 = new Vector2(borderS, 0f);
+	//	Vector2 p2 = new Vector2(rulerSize - borderS, 0f);
+
+	//	float y = canvas.gridRect.position.y;
+	//	float x = canvas.gridRect.position.x;
+
+	//	if (y > yMin)
+	//	{
+	//		while (y > yMin + interval)
+	//		{
+	//			y -= interval;
+	//			m--;
+	//		}
+	//	}
+	//	else
+	//	{
+	//		while (y < yMin)
+	//		{
+	//			y += interval;
+	//			m++;
+	//		}
+	//	}
+
+	//	while (y < yMax)
+	//	{
+	//		major = m++ % majorCells == 0;
+	//		Handles.color = RulerTextStyleL.normal.textColor = major ? majorLineColor : minorLineColor;
+
+	//		p2.x = rulerSize - (major ? borderS : borderL);
+
+	//		p1.y = p2.y = y;
+	//		Handles.DrawLine(p1, p2);
+
+	//		if (!sideways)
+	//		{
+	//			textRect.Set(borderS, y + 1f, rulerSize - borderS - borderS, interval - 1f);
+	//			GUI.Label(textRect, (m - 1).ToString(), RulerTextStyleL);
+	//		}
+	//		else
+	//		{
+	//			textRect.Set(2f, y + borderS, interval, rulerSize);
+	//			GUIUtility.RotateAroundPivot(-90f, new Vector2(0f, y));
+
+	//			GUI.Label(textRect, (m - 1).ToString(), RulerTextStyleL);
+
+	//			GUIUtility.RotateAroundPivot(90f, new Vector2(0f, y));
+	//		}
+
+	//		y += interval;
+	//	}
+
+	//	m = 0;
+	//	p1.y = toolbarHeight + borderS;
+	//	p2.y = gridTrimTop - borderS;
+
+	//	if (x > xMin)
+	//	{
+	//		while (x > xMin + interval)
+	//		{
+	//			x -= interval;
+	//			m--;
+	//		}
+	//	}
+	//	else
+	//	{
+	//		while (x < xMin)
+	//		{
+	//			x += interval;
+	//			m++;
+	//		}
+	//	}
+
+	//	while (x < xMax)
+	//	{
+	//		major = m++ % majorCells == 0;
+	//		Handles.color = RulerTextStyleT.normal.textColor = major ? majorLineColor : minorLineColor;
+
+	//		p2.y = gridTrimTop - (major ? borderS : borderL);
+
+	//		p1.x = p2.x = x;
+	//		Handles.DrawLine(p1, p2);
+
+	//		textRect.Set(x + 2f, toolbarHeight + borderS, interval - 2f, rulerSize - borderS - borderS);
+	//		GUI.Label(textRect, (m - 1).ToString(), RulerTextStyleT);
+
+	//		x += interval;
+	//	}
+
+	//	Handles.color = Color.white;
+	//	Vector2 mPos = Event.current.mousePosition;
+
+	//	Vector3 startL = new Vector3(rulerSize - borderS, mPos.y);
+	//	Vector3 startT = new Vector3(mPos.x, gridTrimTop - borderS);
+
+	//	Vector3[] pointsL = new Vector3[] { startL, new Vector3(startL.x - 5f, startL.y + 5f), new Vector3(startL.x - 5f, startL.y - 5f), startL };
+	//	Vector3[] pointsT = new Vector3[] { startT, new Vector3(startT.x + 5f, startT.y - 5f), new Vector3(startT.x - 5f, startT.y - 5f), startT };
+
+	//	Handles.DrawAAPolyLine(pointsL);
+	//	Handles.DrawAAPolyLine(pointsT);
+
+	//	GUI.Box(cornerPiece, "", RulerStyle);
+
+	//	Handles.EndGUI();
+	//}
+
+	#endregion
+
 	void DrawGuideRulers()
 	{
-		bool sideways = false;
+		Handles.BeginGUI();
 
 		Rect textRect = new Rect();
 
-		leftRuler = new Rect(0f, toolbarHeight + rulerSize, rulerSize, position.height - toolbarHeight - rulerSize);
-		topRuler = new Rect(rulerSize, toolbarHeight, position.width - rulerSize, rulerSize);
-		cornerPiece = new Rect(0f, toolbarHeight, rulerSize, rulerSize);
+		leftRuler = new Rect(sidebarEdgeRect.xMax, toolbarHeight + rulerSize, rulerSize, position.height - toolbarHeight - rulerSize);
+		topRuler = new Rect(sidebarEdgeRect.xMax + rulerSize, toolbarHeight, position.width - rulerSize - sidebarWidth, rulerSize);
+		cornerPiece = new Rect(sidebarEdgeRect.xMax, toolbarHeight, rulerSize, rulerSize);
+
 		GUI.Box(leftRuler, "", RulerStyle);
 		GUI.Box(topRuler, "", RulerStyle);
 
 		Color majorLineColor = Color.white;
 		Color minorLineColor = Color.white.WithAlpha(0.5f);
 
-		Handles.BeginGUI();
 		float borderL = 6f;
 		float borderS = 4f;
 
@@ -428,14 +572,13 @@ public class IconSetWindow : EditorWindow
 
 		float interval = canvas.gridRect.height / canvas.cells;
 
-		float yMin = toolbarHeight + rulerSize + borderS;
-		float yMax = position.height - borderS;
+		float yMin = leftRuler.yMin + borderS;
+		float yMax = leftRuler.yMax - borderS;
+		float xMin = topRuler.xMin + borderS;
+		float xMax = topRuler.xMax - borderS;
 
-		float xMin = rulerSize + borderS;
-		float xMax = position.width - borderS;
-
-		Vector2 p1 = new Vector2(borderS, 0f);
-		Vector2 p2 = new Vector2(rulerSize - borderS, 0f);
+		Vector2 p1 = new Vector2(leftRuler.xMin + borderS, 0f);
+		Vector2 p2 = new Vector2(leftRuler.xMax - borderS, 0f);
 
 		float y = canvas.gridRect.position.y;
 		float x = canvas.gridRect.position.x;
@@ -461,33 +604,17 @@ public class IconSetWindow : EditorWindow
 		{
 			major = m++ % majorCells == 0;
 			Handles.color = RulerTextStyleL.normal.textColor = major ? majorLineColor : minorLineColor;
-
-			p2.x = rulerSize - (major ? borderS : borderL);
-
+			p2.x = leftRuler.xMax - (major ? borderS : borderL);
 			p1.y = p2.y = y;
 			Handles.DrawLine(p1, p2);
-
-			if (!sideways)
-			{
-				textRect.Set(borderS, y + 1f, rulerSize - borderS - borderS, interval - 1f);
-				GUI.Label(textRect, (m - 1).ToString(), RulerTextStyleL);
-			}
-			else
-			{
-				textRect.Set(2f, y + borderS, interval, rulerSize);
-				GUIUtility.RotateAroundPivot(-90f, new Vector2(0f, y));
-
-				GUI.Label(textRect, (m - 1).ToString(), RulerTextStyleL);
-
-				GUIUtility.RotateAroundPivot(90f, new Vector2(0f, y));
-			}
-
+			textRect.Set(leftRuler.xMin + borderS, y + 1f, leftRuler.width - borderS - borderS, interval - 1f);
+			GUI.Label(textRect, (m - 1).ToString(), RulerTextStyleL);
 			y += interval;
 		}
 
 		m = 0;
-		p1.y = toolbarHeight + borderS;
-		p2.y = gridTrimTop - borderS;
+		p1.y = topRuler.yMin + borderS;
+		p2.y = topRuler.yMax - borderS;
 
 		if (x > xMin)
 		{
@@ -510,23 +637,19 @@ public class IconSetWindow : EditorWindow
 		{
 			major = m++ % majorCells == 0;
 			Handles.color = RulerTextStyleT.normal.textColor = major ? majorLineColor : minorLineColor;
-
-			p2.y = gridTrimTop - (major ? borderS : borderL);
-
+			p2.y = topRuler.yMax - (major ? borderS : borderL);
 			p1.x = p2.x = x;
 			Handles.DrawLine(p1, p2);
-
-			textRect.Set(x + 2f, toolbarHeight + borderS, interval - 2f, rulerSize - borderS - borderS);
+			textRect.Set(x + 2f, topRuler.yMin + borderS, interval - 2f, topRuler.height - borderS - borderS);
 			GUI.Label(textRect, (m - 1).ToString(), RulerTextStyleT);
-
 			x += interval;
 		}
 
 		Handles.color = Color.white;
 		Vector2 mPos = Event.current.mousePosition;
 
-		Vector3 startL = new Vector3(rulerSize - borderS, mPos.y);
-		Vector3 startT = new Vector3(mPos.x, gridTrimTop - borderS);
+		Vector3 startL = new Vector3(leftRuler.xMax - borderS, mPos.y);
+		Vector3 startT = new Vector3(mPos.x, topRuler.yMax - borderS);
 
 		Vector3[] pointsL = new Vector3[] { startL, new Vector3(startL.x - 5f, startL.y + 5f), new Vector3(startL.x - 5f, startL.y - 5f), startL };
 		Vector3[] pointsT = new Vector3[] { startT, new Vector3(startT.x + 5f, startT.y - 5f), new Vector3(startT.x - 5f, startT.y - 5f), startT };
@@ -653,7 +776,7 @@ public class IconSetWindow : EditorWindow
 	{
 		get
 		{
-			return rulerSize;
+			return sidebarWidth + rulerSize;
 		}
 	}
 
@@ -677,4 +800,213 @@ public class IconSetWindow : EditorWindow
 
 	#endregion
 
+	#region Sidebar
+
+	Rect sidebarRect;
+	Rect sidebarEdgeRect;
+	Vector2 listItemsScrollPos = Vector2.zero;
+
+	float _sidebarWidth = 200f;
+	public float sidebarWidth
+	{
+		get { return _sidebarWidth; }
+		set { _sidebarWidth = Mathf.Clamp(value, 50f, 250f); }
+	}
+
+	void DrawSidebar()
+	{
+		sidebarRect = new Rect(0f, toolbarHeight, sidebarWidth, position.height - toolbarHeight);
+		sidebarEdgeRect = new Rect(sidebarRect.xMax, sidebarRect.yMin, 4f, sidebarRect.height);
+		EditorGUI.DrawRect(sidebarEdgeRect, new Color(0.1f, 0.1f, 0.1f, 1f));
+		EditorGUIUtility.AddCursorRect(draggingSidebarEdge ? Screen.safeArea : sidebarEdgeRect, MouseCursor.ResizeHorizontal);
+		ListIcons(sidebarRect);
+
+	}
+	bool draggingSidebarEdge;
+	void ProcessSidebarEdgeEvents(Event e)
+	{
+		if (e.type == EventType.MouseDown)
+		{
+			if (sidebarEdgeRect.Contains(e.mousePosition))
+			{
+				draggingSidebarEdge = true;
+				GUI.changed = true;
+				e.Use();
+			}
+		}
+		if (e.rawType == EventType.MouseUp)
+		{
+			if (draggingSidebarEdge)
+			{
+				draggingSidebarEdge = false;
+				GUI.changed = true;
+				e.Use();
+			}
+		}
+		if (e.rawType == EventType.MouseDrag && draggingSidebarEdge)
+		{
+			sidebarWidth = e.mousePosition.x;
+			GUI.changed = true;
+			e.Use();
+		}
+	}
+
+
+	void ListIcons(Rect rect)
+	{
+		GUILayout.BeginArea(rect, RulerStyle);
+
+		if (GUILayout.Button("Load Font..."))
+		{
+			string fontPath = EditorUtility.OpenFilePanel("Load Font", Application.dataPath, "ttf");
+
+			if (fontPath.Length != 0)
+			{
+				resourcePath = fontPath.Split(new string[] { "Resources/" }, StringSplitOptions.RemoveEmptyEntries).Last().Split('.')[0];
+			}
+		}
+
+		if (TestIconFont != null)
+		{
+			GUILayout.Label(TestIconFont.fontNames.First(), EditorStyles.largeLabel);
+
+			listItemsScrollPos = EditorGUILayout.BeginScrollView(listItemsScrollPos, GUIStyle.none, GUI.skin.verticalScrollbar);
+
+			float iconWidth = 50f;
+			//int columns = (int)((rect.width - GUI.skin.verticalScrollbar.CalcSize(GUIContent.none).x) / (iconWidth + IconStyle.margin.horizontal));
+			//int columns = (int)(rect.width / (iconWidth + IconStyle.margin.horizontal));
+			int columns = (int)(rect.width / iconWidth);
+			int currCol = 0;
+			EditorGUILayout.BeginHorizontal();
+
+			foreach (KeyValuePair<string, string> kvp in Icons)
+			{
+				string name = kvp.Key;
+				string iconText = kvp.Value;
+
+				GUILayout.Button(iconText, IconStyle, GUILayout.MinWidth(iconWidth), GUILayout.MinHeight(iconWidth), GUILayout.MaxWidth(iconWidth), GUILayout.MaxHeight(iconWidth));
+				currCol++;
+
+				if (currCol == columns)
+				{
+					currCol = 0;
+					EditorGUILayout.EndHorizontal();
+					EditorGUILayout.BeginHorizontal();
+				}
+			}
+
+			EditorGUILayout.EndHorizontal();
+			//if (Icons != null)
+			//{
+			//	string iconText = "";
+			//	string[] allSplit = AllIcons.Split(' ');
+			//	for (int i = 0; i < allSplit.Length; i++)
+			//	{
+			//		iconText += allSplit[i] + ((i % 4 == 0) ? " \n" : " ");
+			//	}
+
+			//	GUILayout.Label(iconText, IconStyle);
+			//}
+
+			EditorGUILayout.EndScrollView();
+		}
+
+
+		GUILayout.EndArea();
+	}
+
+	#region Font Methods
+
+	string resourcePath;
+
+	Font _testIconFont;
+	public Font TestIconFont
+	{
+		get
+		{
+			if (_testIconFont == null)
+			{
+				_testIconFont = Resources.Load<Font>(resourcePath) as Font;
+			}
+
+			return _testIconFont;
+		}
+	}
+
+	GUIStyle _iconStyle;
+	public GUIStyle IconStyle
+	{
+		get
+		{
+			if (_iconStyle == null)
+			{
+				_iconStyle = new GUIStyle().ActuallyCopyFrom(GUI.skin.button);
+				_iconStyle.font = TestIconFont;
+				_iconStyle.fontSize = 30;
+				_iconStyle.border = new RectOffset(5, 5, 5, 5);
+				_iconStyle.contentOffset = new Vector2(0, 0);
+				_iconStyle.alignment = TextAnchor.MiddleCenter;
+				_iconStyle.margin = new RectOffset().UniformOffset(0);
+			}
+
+			return _iconStyle;
+		}
+	}
+
+	TextAsset _fontTextAsset;
+	TextAsset FontTextAsset
+	{
+		get
+		{
+			if (_fontTextAsset == null)
+			{
+				_fontTextAsset = (TextAsset)Resources.Load(resourcePath.Substring(0, resourcePath.LastIndexOf('-')), typeof(TextAsset));
+			}
+
+			return _fontTextAsset;
+		}
+	}
+
+	string AllIcons = "";
+
+	Dictionary<string, string> _icons;
+	public Dictionary<string, string> Icons
+	{
+		get
+		{
+			if (_icons == null)
+			{
+				_icons = new Dictionary<string, string>();
+
+				string[] lines = FontTextAsset.text.Split(new string[] { "\r\n", "\n" }, StringSplitOptions.None);
+
+				string key, value;
+				foreach (string line in lines)
+				{
+					if (!line.StartsWith("#") && line.IndexOf("=") >= 0)
+					{
+						key = line.Substring(0, line.IndexOf("="));
+						if (!_icons.ContainsKey(key))
+						{
+							value = DecodeRaw("\\u" + line.Substring(line.IndexOf("=") + 1, line.Length - line.IndexOf("=") - 1));
+
+							AllIcons += value + " ";
+							_icons.Add(key, value);
+						}
+					}
+				}
+			}
+
+			return _icons;
+		}
+	}
+
+	public string DecodeRaw(string raw)
+	{
+		return new Regex(@"\\u(?<Value>[a-zA-Z0-9]{4})").Replace(raw, m => ((char)int.Parse(m.Groups["Value"].Value, NumberStyles.HexNumber)).ToString());
+	}
+
+	#endregion
+
+	#endregion
 }

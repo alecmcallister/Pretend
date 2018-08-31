@@ -70,6 +70,9 @@ TODO implementation:
 	- Implement undo/ redo
 		- Add visual undo window (i.e. Gimp)
 
+	- Draw rulers based on canvas rect
+		- Trim grid -> place rulers
+
 	- Figure the fuck out how to draw these fucking shapes on screen, idiot
 
 	- Make the thing actually create an icon
