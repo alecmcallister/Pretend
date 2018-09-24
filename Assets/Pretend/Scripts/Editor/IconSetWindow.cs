@@ -213,7 +213,8 @@ public class IconSetWindow : EditorWindow
 		if (Prefs.DrawRulers.value)
 			DrawGuideRulers();
 
-		DrawSidebar();
+		if (drawSidebar)
+			DrawSidebar();
 
 		DrawToolbar();
 
@@ -247,6 +248,11 @@ public class IconSetWindow : EditorWindow
 				IconFunctionPopup functionPopup = new IconFunctionPopup();
 				functionPopup.FunctionCallback += ReceiveFunctionCallback;
 				PopupWindow.Show(new Rect(e.mousePosition, Vector2.zero), functionPopup);
+			}
+			if (e.keyCode == KeyCode.T && canvas.container.Contains(e.mousePosition))
+			{
+				drawSidebar = !drawSidebar;
+				e.Use();
 			}
 			e.Use();
 		}
@@ -553,9 +559,9 @@ public class IconSetWindow : EditorWindow
 
 		Rect textRect = new Rect();
 
-		leftRuler = new Rect(sidebarEdgeRect.xMax, toolbarHeight + rulerSize, rulerSize, position.height - toolbarHeight - rulerSize);
-		topRuler = new Rect(sidebarEdgeRect.xMax + rulerSize, toolbarHeight, position.width - rulerSize - sidebarWidth, rulerSize);
-		cornerPiece = new Rect(sidebarEdgeRect.xMax, toolbarHeight, rulerSize, rulerSize);
+		leftRuler = new Rect(SidebarEdgeRect.xMax, toolbarHeight + rulerSize, rulerSize, position.height - toolbarHeight - rulerSize);
+		topRuler = new Rect(SidebarEdgeRect.xMax + rulerSize, toolbarHeight, position.width - rulerSize - sidebarWidth, rulerSize);
+		cornerPiece = new Rect(SidebarEdgeRect.xMax, toolbarHeight, rulerSize, rulerSize);
 
 		GUI.Box(leftRuler, "", RulerStyle);
 		GUI.Box(topRuler, "", RulerStyle);
@@ -802,24 +808,55 @@ public class IconSetWindow : EditorWindow
 
 	#region Sidebar
 
-	Rect sidebarRect;
-	Rect sidebarEdgeRect;
+	public bool drawSidebar = false;
+
+	Rect _sidebarRect;
+	public Rect SidebarRect
+	{
+		get
+		{
+			if (_sidebarRect == null)
+				_sidebarRect = new Rect();
+
+			if (drawSidebar)
+				_sidebarRect.Set(0f, toolbarHeight, sidebarWidth, position.height - toolbarHeight);
+			else
+				_sidebarRect.Set(0, 0, 0, 0);
+
+			return _sidebarRect;
+		}
+	}
+	Rect _sidebarEdgeRect;
+	public Rect SidebarEdgeRect
+	{
+		get
+		{
+			if (_sidebarEdgeRect == null)
+				_sidebarEdgeRect = new Rect();
+
+			if (drawSidebar)
+				_sidebarEdgeRect.Set(SidebarRect.xMax, SidebarRect.yMin, 4f, SidebarRect.height);
+			else
+				_sidebarEdgeRect.Set(0, 0, 0, 0);
+
+			return _sidebarEdgeRect;
+		}
+	}
+
 	Vector2 listItemsScrollPos = Vector2.zero;
 
 	float _sidebarWidth = 200f;
 	public float sidebarWidth
 	{
-		get { return _sidebarWidth; }
+		get { return (drawSidebar ? _sidebarWidth : 0f); }
 		set { _sidebarWidth = Mathf.Clamp(value, 50f, 250f); }
 	}
 
 	void DrawSidebar()
 	{
-		sidebarRect = new Rect(0f, toolbarHeight, sidebarWidth, position.height - toolbarHeight);
-		sidebarEdgeRect = new Rect(sidebarRect.xMax, sidebarRect.yMin, 4f, sidebarRect.height);
-		EditorGUI.DrawRect(sidebarEdgeRect, new Color(0.1f, 0.1f, 0.1f, 1f));
-		EditorGUIUtility.AddCursorRect(draggingSidebarEdge ? Screen.safeArea : sidebarEdgeRect, MouseCursor.ResizeHorizontal);
-		ListIcons(sidebarRect);
+		EditorGUI.DrawRect(SidebarEdgeRect, new Color(0.1f, 0.1f, 0.1f, 1f));
+		EditorGUIUtility.AddCursorRect(draggingSidebarEdge ? Screen.safeArea : SidebarEdgeRect, MouseCursor.ResizeHorizontal);
+		ListIcons(SidebarRect);
 
 	}
 	bool draggingSidebarEdge;
@@ -827,7 +864,7 @@ public class IconSetWindow : EditorWindow
 	{
 		if (e.type == EventType.MouseDown)
 		{
-			if (sidebarEdgeRect.Contains(e.mousePosition))
+			if (SidebarEdgeRect.Contains(e.mousePosition))
 			{
 				draggingSidebarEdge = true;
 				GUI.changed = true;
